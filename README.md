@@ -97,7 +97,7 @@ The agent doesn't search. The agent **already knows**. We call this **Intuition*
 
 #### 1. Flow Engine (`src/flow/engine.ts`)
 The heart of FlowState. A background process that:
-- **Watches** the active agent session log using `fs.watch`
+- **Watches** the active agent session log using `fs.watchFile` (resilient to rotations)
 - **Debounces** updates (1500ms) to avoid redundant processing
 - **Vectorizes** the last 2KB of conversation context
 - **Queries** the QMD store for relevant memories (top-3, minScore=0.4)
@@ -140,11 +140,11 @@ The mature foundation we build on:
 
 ### Models
 
-| Component | Model | Format | Size | Purpose |
-|-----------|-------|--------|------|---------|
-| Embeddings | Qwen3-Embedding-4B | Q8_0 GGUF | ~4.2GB | Document & query vectorization |
-| Reranking | Qwen3-Reranker-4B | Q4_0 GGUF | ~2.4GB | Result relevance scoring |
-| Query Expansion | qmd-query-expansion-1.7B | GGUF | ~1.0GB | GRPO-trained query variants |
+| Component | Model (Standard) | Model (Lite) | Purpose |
+|-----------|------------------|--------------|---------|
+| Embeddings | Qwen3-Embedding-4B (Q8_0 GGUF, 4.2GB) | bge-micro-v2-GGUF (~800MB) | Document & query vectorization |
+| Reranking | Qwen3-Reranker-4B (Q4_0 GGUF, 2.4GB) | jina-reranker-v1-tiny-en-GGUF (~300MB) | Result relevance scoring |
+| Query Expansion | qmd-query-expansion-1.7B (1.0GB) | (Optional, skips if low latency) | GRPO-trained query variants |
 
 ### Tech Stack
 
@@ -160,14 +160,15 @@ The mature foundation we build on:
 
 ### Performance
 
-| Metric | Value |
-|--------|-------|
-| Intuition Cache Read | < 50ms (disk I/O) |
-| Flow Engine Cycle | ~2-3s (debounced) |
-| BM25 Search | < 10ms |
-| Vector Search (top-10) | < 50ms |
-| Full Hybrid + Rerank | < 500ms |
-| Model Auto-Unload | 5 min inactivity |
+| Metric | Standard (4B) | Lite (~0.8B) | 
+|--------|---------------|--------------|
+| Intuition Cache Read | < 50ms (disk I/O) | < 50ms (disk I/O) |
+| Model VRAM Usage | ~6.5GB | ~1.2GB |
+| Flow Engine Cycle | ~2-3s (debounced) | ~1.5s (faster inference) |
+| BM25 Search | < 10ms | < 10ms |
+| Vector Search (top-10) | < 50ms | < 20ms |
+| Full Hybrid + Rerank | < 500ms | < 200ms |
+| Apple Silicon Support | M2 Pro+ / 16GB+ RAM | M1/M2/M3 all supported (8GB RAM) |
 
 ---
 
