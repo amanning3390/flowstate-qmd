@@ -2557,15 +2557,16 @@ function showHelp(): void {
   console.log("Usage:");
   console.log("  qmd <command> [options]");
   console.log("");
-  console.log("Primary commands:");
+console.log("Primary commands:");
   console.log("  qmd query <query>             - Hybrid search with auto expansion + reranking (recommended)");
-  console.log("  qmd query 'lex:..\\nvec:...'   - Structured query document (you provide lex/vec/hyde lines)");
+  console.log("  qmd query 'lex:..\\\\nvec:...'   - Structured query document (you provide lex/vec/hyde lines)");
   console.log("  qmd search <query>            - Full-text BM25 keywords (no LLM)");
   console.log("  qmd vsearch <query>           - Vector similarity only");
   console.log("  qmd get <file>[:line] [-l N]  - Show a single document, optional line slice");
   console.log("  qmd multi-get <pattern>       - Batch fetch via glob or comma-separated list");
   console.log("  qmd skill show/install        - Show or install the packaged QMD skill");
   console.log("  qmd mcp                       - Start the MCP server (stdio transport for AI agents)");
+  console.log("  qmd flow <targetFile>         - Start FlowEngine for anticipatory memory (--lite for low VRAM)");
   console.log("");
   console.log("Collections & context:");
   console.log("  qmd collection add/list/remove/rename/show   - Manage indexed folders");
@@ -2691,6 +2692,16 @@ if (isMain) {
     console.log("  --global             Install into ~/.agents/skills/qmd");
     console.log("  --yes                Also create the .claude/skills/qmd symlink");
     console.log("  -f, --force          Replace existing install or symlink");
+    process.exit(0);
+  }
+
+  if (cli.values.help && cli.command === "flow") {
+    console.log("Usage: qmd flow <targetFile> [options]");
+    console.log("");
+    console.log("Start the FlowEngine to monitor agent sessions contextually");
+    console.log("");
+    console.log("Options:");
+    console.log("  --lite   Run in ultra-lite mode using ~0.8B models for low VRAM consumption");
     process.exit(0);
   }
 
