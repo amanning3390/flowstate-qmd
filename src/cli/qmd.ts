@@ -2567,6 +2567,7 @@ console.log("Primary commands:");
   console.log("  qmd skill show/install        - Show or install the packaged QMD skill");
   console.log("  qmd mcp                       - Start the MCP server (stdio transport for AI agents)");
   console.log("  qmd flow <targetFile>         - Start FlowEngine for anticipatory memory (--lite for low VRAM)");
+  console.log("  qmd init - Initialize FlowState-QMD as default memory system");
   console.log("");
   console.log("Collections & context:");
   console.log("  qmd collection add/list/remove/rename/show   - Manage indexed folders");
@@ -2737,6 +2738,10 @@ if (isMain) {
       }
 
       await startFlowEngine(resolve(targetFile), isLite);
+      break;
+    }
+    case "init": {
+      await initializeSystem();
       break;
     }
 
@@ -3224,5 +3229,90 @@ if (isMain) {
     await disposeDefaultLlamaCpp();
     process.exit(0);
   }
+
+
+async function initializeSystem(): Promise<void> {
+  // Step 1: Install the QMD skill globally (if not already)
+  console.log("Installing QMD skill globally...");
+  await installSkill(true, true, true);
+
+  // Step 2: Start MCP server as daemon (if not already running)
+  console.log("Starting MCP server as daemon...");
+  const cacheDir = process.env.XDG_CACHE_HOME || resolve(homedir(), '.cache');
+  const mcpCacheDir = resolve(cacheDir, 'qmd');
+  const pidPath = resolve(mcpCacheDir, 'mcp.pid');
+  
+  // Check if already running
+  if (existsSync(pidPath)) {
+    const pid = parseInt(readFileSync(pidPath, 'utf-8').trim());
+    try {
+      process.kill(pid, 0); // Check if process exists
+      console.log(`MCP server already running (PID ${pid})`);
+      return; // Already running, no need to start again
+    } catch {
+      // Process not running, remove stale pid file
+      unlinkSync(pidPath);
+    }
+  }
+
+  // If not running, start it
+  const port = 8181;
+  const logPath = resolve(mcpCacheDir, "mcp.log");
+  const logFd = openSync(logPath, "w");
+  const selfPath = fileURLToPath(import.meta.url);
+  const spawnArgs = selfPath.endsWith(".ts")
+    ? ["--import", pathJoin(dirname(selfPath), "..", "..", "node_modules", "tsx", "dist", "esm", "index.mjs"), selfPath, "mcp", "--http", "--port", String(port)]
+    : [selfPath, "mcp", "--http", "--port", String(port)];
+  const child = nodeSpawn(process.execPath, spawnArgs, {
+    stdio: ["ignore", logFd, logFd],
+    detached: true,
+  });
+  child.unref();
+  closeSync(logFd);
+
+  writeFileSync(pidPath, String(child.pid));
+  console.log(`MCP server started on http://localhost:${port}/mcp (PID ${child.pid})`);
+
+  // Step 3: Create configuration file for agents (in cache directory)
+  const configPath = resolve(mcpCacheDir, 'agent-config.json');
+  
+  const config = {
+    mcp_servers: {
+      'flowstate-qmd': {
+        url: `http://localhost:${port}`,
+        transport: 'http',
+        description: 'FlowState-QMD: Anticipatory Memory for AI Agents',
+      },
+    },
+    default_memory: 'flowstate-qmd',
+    auto_connect: true,
+    instructions: 'Connect to FlowState-QMD MCP server at startup for anticipatory memory.',
+  };
+  
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
+  console.log(`Agent configuration saved to: ${configPath}`);
+
+  // Step 4: Create a startup script (in cache directory)
+  const scriptPath = resolve(mcpCacheDir, 'start-flowstate.sh');
+  const scriptContent = `#!/bin/bash
+# Start FlowState-QMD MCP server for agent memory
+qmd mcp --http --daemon --port ${port}
+# Wait a moment for server to start
+sleep 2
+# Output connection info
+echo "FlowState-QMD MCP server running on http://localhost:${port}"
+echo "Use fetch_anticipatory_context tool for anticipatory memory"
+`;
+  writeFileSync(scriptPath, scriptContent);
+  // Make executable
+  await new Promise((resolve, reject) => {
+    nodeSpawn('chmod', ['+x', scriptPath]).on('close', resolve);
+  });
+  console.log(`Startup script created: ${scriptPath}`);
+
+  console.log('\n✅ FlowState-QMD is now set as default memory system!');
+  console.log('\nAgents can now connect via MCP to: http://localhost:' + port);
+  console.log('Use the \'fetch_anticipatory_context\' tool for instant memory retrieval.');
+}
 
 } // end if (main module)
