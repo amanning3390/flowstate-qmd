@@ -7,6 +7,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { RUN_LLM_INTEGRATION } from "./test-flags.js";
 import { openDatabase, loadSqliteVec } from "../src/db.js";
 import type { Database } from "../src/db.js";
 import { unlink, mkdtemp, rmdir, writeFile } from "node:fs/promises";
@@ -563,19 +564,40 @@ describe("Document Helpers", () => {
 // =============================================================================
 
 describe("Embedding Formatting", () => {
-  test("formatQueryForEmbedding adds search task prefix", () => {
-    const formatted = formatQueryForEmbedding("how to deploy");
+  test("formatQueryForEmbedding uses Qwen instruct format when Qwen embed model is active", () => {
+    const formatted = formatQueryForEmbedding(
+      "how to deploy",
+      "hf:Qwen/Qwen3-Embedding-4B-GGUF/Qwen3-Embedding-4B-Q8_0.gguf"
+    );
+    expect(formatted).toBe("Instruct: Retrieve relevant documents for the given query\nQuery: how to deploy");
+  });
+
+  test("formatQueryForEmbedding keeps nomic-style format for non-Qwen models", () => {
+    const formatted = formatQueryForEmbedding("how to deploy", "embeddinggemma");
     expect(formatted).toBe("task: search result | query: how to deploy");
   });
 
-  test("formatDocForEmbedding adds title and text prefix", () => {
-    const formatted = formatDocForEmbedding("Some content", "My Title");
-    expect(formatted).toBe("title: My Title | text: Some content");
+  test("formatDocForEmbedding uses raw text for Qwen models", () => {
+    const formatted = formatDocForEmbedding(
+      "Some content",
+      "My Title",
+      "hf:Qwen/Qwen3-Embedding-4B-GGUF/Qwen3-Embedding-4B-Q8_0.gguf"
+    );
+    expect(formatted).toBe("My Title\nSome content");
   });
 
-  test("formatDocForEmbedding handles missing title", () => {
-    const formatted = formatDocForEmbedding("Some content");
-    expect(formatted).toBe("title: none | text: Some content");
+  test("formatDocForEmbedding handles missing title for Qwen models", () => {
+    const formatted = formatDocForEmbedding(
+      "Some content",
+      undefined,
+      "hf:Qwen/Qwen3-Embedding-4B-GGUF/Qwen3-Embedding-4B-Q8_0.gguf"
+    );
+    expect(formatted).toBe("Some content");
+  });
+
+  test("formatDocForEmbedding keeps title/text prefix for non-Qwen models", () => {
+    const formatted = formatDocForEmbedding("Some content", "My Title", "embeddinggemma");
+    expect(formatted).toBe("title: My Title | text: Some content");
   });
 });
 
@@ -659,7 +681,7 @@ describe("Document Chunking", () => {
   });
 });
 
-describe.skipIf(!!process.env.CI)("Token-based Chunking", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("Token-based Chunking", () => {
   test("chunkDocumentByTokens returns single chunk for small documents", async () => {
     const content = "This is a small document.";
     const chunks = await chunkDocumentByTokens(content, 900, 135);
@@ -2268,7 +2290,7 @@ describe("Integration", () => {
 // LlamaCpp Integration Tests (using real local models)
 // =============================================================================
 
-describe.skipIf(!!process.env.CI)("LlamaCpp Integration", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("LlamaCpp Integration", () => {
   test("searchVec returns empty when no vector index", async () => {
     const store = await createTestStore();
     const collectionName = await createTestCollection();

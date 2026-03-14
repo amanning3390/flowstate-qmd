@@ -6,6 +6,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { RUN_LLM_INTEGRATION } from "./test-flags.js";
 import { openDatabase, loadSqliteVec } from "../src/db.js";
 import type { Database } from "../src/db.js";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -323,7 +324,7 @@ describe("MCP Server", () => {
   // searchVec (Vector similarity search)
   // ===========================================================================
 
-  describe.skipIf(!!process.env.CI)("searchVec (vector similarity)", () => {
+  describe.skipIf(!RUN_LLM_INTEGRATION)("searchVec (vector similarity)", () => {
     test("returns results for semantic query", async () => {
       const results = await searchVec(testDb, "project documentation", DEFAULT_EMBED_MODEL, 10);
       expect(results.length).toBeGreaterThan(0);
@@ -349,7 +350,7 @@ describe("MCP Server", () => {
   // hybridQuery (query expansion + reranking)
   // ===========================================================================
 
-  describe.skipIf(!!process.env.CI)("hybridQuery (expansion + reranking)", () => {
+  describe.skipIf(!RUN_LLM_INTEGRATION)("hybridQuery (expansion + reranking)", () => {
     test("expands query with typed variations", async () => {
       const expanded = await expandQuery("api documentation", DEFAULT_QUERY_MODEL, testDb);
       // Returns ExpandedQuery[] — typed expansions, original excluded

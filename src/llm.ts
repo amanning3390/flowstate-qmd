@@ -193,8 +193,10 @@ export type RerankDocument = {
 // HuggingFace model URIs for node-llama-cpp
 // Format: hf:<user>/<repo>/<file>
 // Override via QMD_EMBED_MODEL env var (e.g. hf:Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-Q8_0.gguf)
-const DEFAULT_EMBED_MODEL = process.env.QMD_EMBED_MODEL ?? "hf:Qwen/Qwen3-Embedding-4B-GGUF/qwen3-embedding-4b-q8_0.gguf";
-const DEFAULT_RERANK_MODEL = "hf:Qwen/Qwen3-Reranker-4B-GGUF/qwen3-reranker-4b-q8_0.gguf";
+// Keep filenames case-exact — Hugging Face resolves are case-sensitive.
+const DEFAULT_EMBED_MODEL = process.env.QMD_EMBED_MODEL ?? "hf:Qwen/Qwen3-Embedding-4B-GGUF/Qwen3-Embedding-4B-Q8_0.gguf";
+// The official Qwen reranker GGUF repo is not publicly downloadable; use a public mirror by default.
+const DEFAULT_RERANK_MODEL = process.env.QMD_RERANK_MODEL ?? "hf:QuantFactory/Qwen3-Reranker-4B-GGUF/Qwen3-Reranker-4B.Q4_0.gguf";
 // const DEFAULT_GENERATE_MODEL = "hf:ggml-org/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf";
 const DEFAULT_GENERATE_MODEL = "hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf";
 

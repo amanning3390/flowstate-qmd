@@ -18,6 +18,7 @@ import {
   type RerankDocument,
   type ILLMSession,
 } from "../src/llm.js";
+import { RUN_LLM_INTEGRATION } from "./test-flags.js";
 
 // =============================================================================
 // Singleton Tests (no model loading required)
@@ -153,7 +154,7 @@ describe("LlamaCpp rerank deduping", () => {
 // Integration Tests (require actual models)
 // =============================================================================
 
-describe.skipIf(!!process.env.CI)("LlamaCpp Integration", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("LlamaCpp Integration", () => {
   // Use the singleton to avoid multiple Metal contexts
   const llm = getDefaultLlamaCpp();
 
@@ -556,7 +557,7 @@ describe.skipIf(!!process.env.CI)("LlamaCpp Integration", () => {
 // Session Management Tests
 // =============================================================================
 
-describe.skipIf(!!process.env.CI)("LLM Session Management", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("LLM Session Management", () => {
   describe("withLLMSession", () => {
     test("session provides access to LLM operations", async () => {
       const result = await withLLMSession(async (session) => {

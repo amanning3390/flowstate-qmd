@@ -10,6 +10,7 @@
 
     // Node.js module resolution
     "moduleResolution": "nodenext",
+    "types": ["node"],
     "verbatimModuleSyntax": true,
     "noEmit": true,
 

@@ -6,6 +6,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { RUN_LLM_INTEGRATION } from "./test-flags.js";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -615,7 +616,7 @@ describe("search (unified API)", () => {
   });
 
   // Tests below use search({ query: ... }) which triggers LLM query expansion
-  describe.skipIf(!!process.env.CI)("with LLM query expansion", () => {
+  describe.skipIf(!RUN_LLM_INTEGRATION)("with LLM query expansion", () => {
     test("search() with query and rerank:false returns results", async () => {
       const results = await store.search({ query: "authentication", rerank: false });
       expect(results.length).toBeGreaterThan(0);

@@ -11,6 +11,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { RUN_LLM_INTEGRATION } from "./test-flags.js";
 import { mkdtempSync, rmSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -156,7 +157,7 @@ describe("BM25 Search (FTS)", () => {
 // Vector Search Tests - Requires embedding model
 // =============================================================================
 
-describe.skipIf(!!process.env.CI)("Vector Search", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("Vector Search", () => {
   let store: ReturnType<typeof createStore>;
   let db: Database;
   let hasEmbeddings = false;
@@ -268,7 +269,7 @@ describe.skipIf(!!process.env.CI)("Vector Search", () => {
 // Hybrid Search (RRF) Tests - Combines BM25 + Vector
 // =============================================================================
 
-describe.skipIf(!!process.env.CI)("Hybrid Search (RRF)", () => {
+describe.skipIf(!RUN_LLM_INTEGRATION)("Hybrid Search (RRF)", () => {
   let store: ReturnType<typeof createStore>;
   let db: Database;
   let hasVectors = false;
