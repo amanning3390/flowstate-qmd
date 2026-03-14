@@ -39,27 +39,9 @@ import type {
 // =============================================================================
 
 const HOME = process.env.HOME || "/tmp";
-
-// Define our hardware tiers
-export const MODELS = {
-  standard: {
-    embed: "embeddinggemma",
-    rerank: "ExpedientFalcon/qwen3-reranker:0.6b-q8_0",
-    query: "Qwen/Qwen3-1.7B"
-  },
-  lite: {
-    // Utilizing ~0.5B to 0.8B parameter models
-    // e.g., Qwen2-0.5B-Instruct-GGUF or bge-micro-v2
-    embed: "bge-micro-v2-0.8B.gguf",
-    rerank: "jina-reranker-v1-tiny.gguf",
-    query: "Qwen/Qwen2.5-0.5B-Instruct-GGUF"
-  }
-};
-
 export const DEFAULT_EMBED_MODEL = "embeddinggemma";
 export const DEFAULT_RERANK_MODEL = "ExpedientFalcon/qwen3-reranker:0.6b-q8_0";
 export const DEFAULT_QUERY_MODEL = "Qwen/Qwen3-1.7B";
-
 export const DEFAULT_GLOB = "**/*.md";
 export const DEFAULT_MULTI_GET_MAX_BYTES = 10 * 1024; // 10KB
 export const DEFAULT_EMBED_MAX_DOCS_PER_BATCH = 64;
@@ -3693,7 +3675,6 @@ export interface HybridQueryOptions {
   intent?: string;          // domain intent hint for disambiguation
   skipRerank?: boolean;     // skip LLM reranking, use only RRF scores
   hooks?: SearchHooks;
-  useLiteModels?: boolean;
 }
 
 export interface HybridQueryResult {
@@ -3803,11 +3784,6 @@ export async function hybridQuery(
     }
   }
 
-    const isLiteMode = options?.useLiteModels ?? false;
-  const tier = isLiteMode ? MODELS.lite : MODELS.standard;
-  const embedModel = tier.embed;
-  const rerankModel = tier.rerank;
-
   // 3b: Collect all texts that need vector search (original query + vec/hyde expansions)
   if (hasVectors) {
     const vecQueries: { text: string; queryType: "original" | "vec" | "hyde" }[] = [
@@ -3833,7 +3809,7 @@ export async function hybridQuery(
       if (!embedding) continue;
 
       const vecResults = await store.searchVec(
-        vecQueries[i]!.text, embedModel, 20, collection,
+        vecQueries[i]!.text, DEFAULT_EMBED_MODEL, 20, collection,
         undefined, embedding
       );
       if (vecResults.length > 0) {
@@ -3946,7 +3922,7 @@ export async function hybridQuery(
 
   hooks?.onRerankStart?.(chunksToRerank.length);
   const rerankStart = Date.now();
-  const reranked = await store.rerank(query, chunksToRerank, rerankModel, intent);
+  const reranked = await store.rerank(query, chunksToRerank, undefined, intent);
   hooks?.onRerankDone?.(Date.now() - rerankStart);
 
   // Step 7: Blend RRF position score with reranker score

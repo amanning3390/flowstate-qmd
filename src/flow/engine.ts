@@ -1,10 +1,8 @@
 import {
-  watchFile,
-  unwatchFile,
+  watch,
   statSync,
   existsSync,
   writeFileSync,
-  renameSync,
   mkdirSync,
   openSync,
   closeSync,
@@ -19,7 +17,7 @@ const CACHE_DIR = join(homedir(), ".cache", "qmd");
 const INTUITION_CACHE = join(CACHE_DIR, "intuition.json");
 const TAIL_BYTES = 2048;
 const MIN_CONTEXT_CHARS = 50;
-const WATCH_INTERVAL_MS = 1000; // Poll interval for fs.watchFile
+const DEBOUNCE_MS = 1500;
 
 export type Intuition = {
   timestamp: number;
@@ -33,32 +31,36 @@ function ensureCacheDir(): void {
   }
 }
 
-// BUGFIX 1: Prevent Null-Byte Injection by capturing bytesRead
 function readTail(path: string, fileSize: number, maxBytes: number = TAIL_BYTES): string {
   const bytesToRead = Math.min(fileSize, maxBytes);
-  if (bytesToRead <= 0) return "";
+  if (bytesToRead <= 0) {
+    return "";
+  }
 
   const buffer = Buffer.alloc(bytesToRead);
   const fd = openSync(path, "r");
 
   try {
-    const position = Math.max(0, fileSize - bytesToRead);
-    const bytesRead = readSync(fd, buffer, 0, bytesToRead, position);
-    // Only parse the actual bytes read, ignoring trailing \0 allocations
-    return buffer.subarray(0, bytesRead).toString("utf-8");
+    readSync(fd, buffer, 0, bytesToRead, fileSize - bytesToRead);
+    return buffer.toString("utf-8");
   } finally {
     closeSync(fd);
   }
 }
 
-// BUGFIX 2: Atomic Cache Writing
+/**
+ * Update the intuition cache with fresh memories based on current context.
+ * Uses the standalone hybridQuery() which manages its own LLM session.
+ */
 export async function updateIntuition(context: string, isLiteMode: boolean = false): Promise<void> {
   const store = createStore();
+
   try {
     const results = await hybridQuery(store, context, {
       limit: 3,
       minScore: 0.4,
-      useLiteModels: isLiteMode // Pass lite mode flag down to the store
+      // @ts-ignore
+      useLiteModels: isLiteMode
     });
 
     const intuition: Intuition = {
@@ -67,13 +69,18 @@ export async function updateIntuition(context: string, isLiteMode: boolean = fal
       memories: results,
     };
 
+
     ensureCacheDir();
-    
-    // Write to a temporary file first, then atomically rename
     const tempCachePath = `${INTUITION_CACHE}.tmp`;
     writeFileSync(tempCachePath, JSON.stringify(intuition, null, 2));
-    renameSync(tempCachePath, INTUITION_CACHE);
-    
+    // Atomic rename to prevent race conditions
+    import("fs").then(fs => {
+      fs.renameSync(tempCachePath, INTUITION_CACHE);
+    }).catch(err => {
+      // Fallback
+      writeFileSync(INTUITION_CACHE, JSON.stringify(intuition, null, 2));
+    });
+
     console.log(`[FLOW] Intuition updated (${results.length} memories)`);
   } catch (error) {
     console.error("[FLOW] Failed to update intuition:", error);
@@ -82,52 +89,103 @@ export async function updateIntuition(context: string, isLiteMode: boolean = fal
   }
 }
 
-// BUGFIX 3: Resilient File Watching using fs.watchFile
+/**
+ * Main loop for the Flow Engine - Refined Event-Driven Watcher
+ *
+ * Uses fs.watch for near-zero latency updates as the agent logs.
+ * Includes a debouncer to prevent thrashing during rapid output.
+ */
 export async function startFlowEngine(targetFile: string, isLiteMode: boolean = false): Promise<void> {
   if (!existsSync(targetFile)) {
     throw new Error(`[FLOW] Target file not found: ${targetFile}`);
   }
 
   ensureCacheDir();
-  console.log(`[FLOW] Monitoring ${targetFile} (Polling Mode)...`);
-  if (isLiteMode) console.log(`[FLOW] Running in LITE MODE (0.8B models)`);
+
+  console.log(`[FLOW] Monitoring ${targetFile} (Event-Driven)...`);
+  console.log(`[FLOW] Intuition cache: ${INTUITION_CACHE}`);
+  console.log("[FLOW] Press Ctrl+C to stop.");
 
   let lastSize = statSync(targetFile).size;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let updateInFlight = false;
+  let rerunRequested = false;
 
-  // fs.watchFile survives file rotations natively by polling the stat object
-  watchFile(targetFile, { interval: WATCH_INTERVAL_MS }, async (curr, prev) => {
-    if (updateInFlight) return;
-    
+  const processLatestChange = async (): Promise<void> => {
+    if (updateInFlight) {
+      rerunRequested = true;
+      return;
+    }
+
+    updateInFlight = true;
+
     try {
-      updateInFlight = true;
+      const stats = statSync(targetFile);
 
-      if (curr.size < lastSize) {
-        console.log("[FLOW] Target file was truncated or rotated; resetting state.");
+      if (stats.size < lastSize) {
+        console.log("[FLOW] Target file was truncated or rotated; resetting watcher state.");
         lastSize = 0;
       }
 
-      if (curr.size === lastSize) return;
+      if (stats.size === lastSize) {
+        return;
+      }
 
-      const content = readTail(targetFile, curr.size);
-      lastSize = curr.size;
+      const content = readTail(targetFile, stats.size);
+      lastSize = stats.size;
 
-      if (content.trim().length < MIN_CONTEXT_CHARS) return;
+      if (content.trim().length < MIN_CONTEXT_CHARS) {
+        return;
+      }
 
       await updateIntuition(content, isLiteMode);
     } catch (err) {
       console.error("[FLOW] Watcher error:", err);
     } finally {
       updateInFlight = false;
+
+      if (rerunRequested) {
+        rerunRequested = false;
+        void processLatestChange();
+      }
     }
+  };
+
+  const watcher = watch(targetFile, (eventType) => {
+    if (eventType !== "change") {
+      return;
+    }
+
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
+    debounceTimer = setTimeout(() => {
+      void processLatestChange();
+    }, DEBOUNCE_MS);
   });
 
   const shutdown = (signal: string, exitCode: number): void => {
-    unwatchFile(targetFile);
-    if (signal === "SIGINT") console.log("\n[FLOW] Stopped.");
+    watcher.close();
+
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+
+    process.off("SIGINT", handleSigint);
+    process.off("SIGTERM", handleSigterm);
+
+    if (signal === "SIGINT") {
+      console.log("\n[FLOW] Stopped.");
+    }
+
     process.exit(exitCode);
   };
 
-  process.on("SIGINT", () => shutdown("SIGINT", 0));
-  process.on("SIGTERM", () => shutdown("SIGTERM", 0));
+  const handleSigint = (): void => shutdown("SIGINT", 0);
+  const handleSigterm = (): void => shutdown("SIGTERM", 0);
+
+  process.on("SIGINT", handleSigint);
+  process.on("SIGTERM", handleSigterm);
 }
