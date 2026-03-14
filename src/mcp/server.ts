@@ -516,6 +516,36 @@ Intent-aware lex (C++ performance, not sports):
     }
   );
 
+  // ---------------------------------------------------------------------------
+  // Tool: fetch_anticipatory_context (FlowState-QMD specific)
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "fetch_anticipatory_context",
+    {
+      title: "Fetch Anticipatory Context",
+      description: "Fetch immediate, predictive context based on the current conversational state. This is the FlowState-QMD anticipatory memory tool that eliminates the Stutter Loop.",
+      annotations: { readOnlyHint: true, openWorldHint: false },
+      inputSchema: {},
+    },
+    async () => {
+      // For now, return a static response indicating the tool is available
+      // In a real implementation, this would use the store's hybrid query
+      const status = await store.getStatus();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            message: "FlowState-QMD anticipatory memory tool is ready",
+            totalDocuments: status.totalDocuments,
+            note: "This tool is under development. Use the 'query' tool for regular search.",
+            timestamp: new Date().toISOString(),
+          }, null, 2),
+        }],
+      };
+    }
+  );
+
   return server;
 }
 
