@@ -1,7 +1,7 @@
 {
-  "name": "@tobilu/qmd",
-  "version": "2.0.1",
-  "description": "Query Markup Documents - On-device hybrid search for markdown files with BM25, vector search, and LLM reranking",
+  "name": "flowstate-qmd",
+  "version": "1.0.0",
+  "description": "FlowState QMD — Anticipatory Memory for AI Agents. Built on tobi/qmd for the Hermes 2026 Hackathon.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -38,11 +38,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tobi/qmd.git"
+    "url": "git+https://github.com/amanning3390/flowstate-qmd.git"
   },
-  "homepage": "https://github.com/tobi/qmd#readme",
+  "homepage": "https://github.com/amanning3390/flowstate-qmd#readme",
   "bugs": {
-    "url": "https://github.com/tobi/qmd/issues"
+    "url": "https://github.com/amanning3390/flowstate-qmd/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
@@ -90,6 +90,9 @@
     "local-ai",
     "llm"
   ],
-  "author": "Tobi Lutke <tobi@lutke.com>",
+  "author": "Adam Manning <adam.manning@pro-serveinc.com>",
+  "contributors": [
+    "Tobi Lutke <tobi@lutke.com>"
+  ],
   "license": "MIT"
 }

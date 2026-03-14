@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.0.0-flowstate] - 2026-03-14
+
+### Hermes Hackathon 2026 — FlowState: Anticipatory Memory for AI Agents
+
+This release transforms QMD from a reactive search engine into an **anticipatory memory system** for AI agents.
+
+### Added
+
+- **Flow Engine** (`src/flow/engine.ts`): Background process that watches agent session logs,
+  vectorizes the last 2KB of context, and pre-fetches relevant memories before the agent begins its turn.
+  Uses `fs.watch` with 1500ms debouncing. Handles file truncation/rotation and graceful shutdown.
+- **Intuition Cache** (`~/.cache/qmd/intuition.json`): JSON file containing top-3 pre-fetched memories,
+  read by the Hermes agent at turn start with < 50ms latency.
+- **Embedded Hermes Skill** (`src/embedded-skills.ts`): Base64-encoded skill files that teach
+  the Hermes agent to check the intuition cache and inject context into the system prompt.
+- **Qwen3 Model Upgrades**: Swapped default embeddinggemma models for Qwen3-Embedding-4B (Q8_0)
+  and Qwen3-Reranker-4B (Q4_0) for improved search quality.
+- **Test Infrastructure**: Added `test/test-flags.ts` to gate LLM integration tests behind
+  `QMD_RUN_LLM_TESTS=1` env var. Added flow engine unit tests.
+- **MCP Query Tool Enhancement**: Made rerank=false the default for faster responses.
+
+### Fixed
+
+- Default HF embed filename casing for HuggingFace case-sensitivity.
+- Switched default reranker URI to public QuantFactory mirror.
+- Added `@types/node` to devDependencies for clean builds after `npm install`.
+
+### Stabilized
+
+- Flow engine: file tail reading, truncation handling, non-overlapping updates.
+- Test suite: updated stale embedding-format expectations, 646 tests passing.
+
+### Credits
+
+Built on top of [QMD](https://github.com/tobi/qmd) by Tobi Lütke.
+FlowState additions by Adam Manning for the Hermes 2026 Hackathon.
+
+---
+
 ## [Unreleased]
 
 ### Fixes
