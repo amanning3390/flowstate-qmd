@@ -27,6 +27,44 @@ export type Intuition = {
   memories: HybridQueryResult[];
 };
 
+export type FlowTelemetry = {
+  cacheHits: number;
+  cacheMisses: number;
+  lastHitAt: number | null;
+  lastMissAt: number | null;
+  totalRefreshes: number;
+  avgRefreshMs: number;
+};
+
+const telemetry: FlowTelemetry = {
+  cacheHits: 0,
+  cacheMisses: 0,
+  lastHitAt: null,
+  lastMissAt: null,
+  totalRefreshes: 0,
+  avgRefreshMs: 0,
+};
+
+export function getFlowTelemetry(): FlowTelemetry {
+  return { ...telemetry };
+}
+
+export function resetFlowTelemetry(): void {
+  telemetry.cacheHits = 0;
+  telemetry.cacheMisses = 0;
+  telemetry.lastHitAt = null;
+  telemetry.lastMissAt = null;
+  telemetry.totalRefreshes = 0;
+  telemetry.avgRefreshMs = 0;
+}
+
+function recordRefreshDuration(ms: number): void {
+  const prev = telemetry.avgRefreshMs;
+  const n = telemetry.totalRefreshes;
+  telemetry.totalRefreshes = n + 1;
+  telemetry.avgRefreshMs = n === 0 ? ms : (prev * n + ms) / (n + 1);
+}
+
 type FlowEngineRuntime = {
   watch: typeof watch;
   statSync: typeof statSync;
@@ -103,13 +141,20 @@ export function readIntuitionCache(): Intuition | null {
   const runtime = getRuntime();
   const intuitionCache = getIntuitionCachePath();
   if (!runtime.existsSync(intuitionCache)) {
+    telemetry.cacheMisses++;
+    telemetry.lastMissAt = Date.now();
     return null;
   }
 
   try {
     const raw = runtime.readFileSync(intuitionCache, "utf-8");
-    return JSON.parse(raw) as Intuition;
+    const result = JSON.parse(raw) as Intuition;
+    telemetry.cacheHits++;
+    telemetry.lastHitAt = Date.now();
+    return result;
   } catch {
+    telemetry.cacheMisses++;
+    telemetry.lastMissAt = Date.now();
     return null;
   }
 }
@@ -119,6 +164,36 @@ function ensureCacheDir(): void {
   const cacheDir = getCacheDir();
   if (!runtime.existsSync(cacheDir)) {
     runtime.mkdirSync(cacheDir, { recursive: true });
+  }
+}
+
+function getTelemetryPath(): string {
+  return join(getCacheDir(), "telemetry.json");
+}
+
+function persistTelemetry(): void {
+  const runtime = getRuntime();
+  try {
+    ensureCacheDir();
+    runtime.writeFileSync(getTelemetryPath(), JSON.stringify(telemetry, null, 2));
+  } catch {
+    // Non-critical — telemetry loss is acceptable
+  }
+}
+
+export function loadTelemetry(): FlowTelemetry {
+  const runtime = getRuntime();
+  const telemetryPath = getTelemetryPath();
+  if (!runtime.existsSync(telemetryPath)) {
+    return { ...telemetry };
+  }
+  try {
+    const raw = runtime.readFileSync(telemetryPath, "utf-8");
+    const loaded = JSON.parse(raw) as FlowTelemetry;
+    Object.assign(telemetry, loaded);
+    return { ...telemetry };
+  } catch {
+    return { ...telemetry };
   }
 }
 
@@ -147,6 +222,7 @@ function readTail(path: string, fileSize: number, maxBytes: number = TAIL_BYTES)
 export async function updateIntuition(context: string, isLiteMode: boolean = false): Promise<void> {
   const runtime = getRuntime();
   const store = runtime.createStore();
+  const startMs = Date.now();
 
   try {
     const results = await runtime.hybridQuery(store, context, {
@@ -162,6 +238,8 @@ export async function updateIntuition(context: string, isLiteMode: boolean = fal
     };
     ensureCacheDir();
     persistIntuitionCache(intuition);
+    recordRefreshDuration(Date.now() - startMs);
+    persistTelemetry();
 
     console.log(`[FLOW] Intuition updated (${results.length} memories)`);
   } catch (error) {

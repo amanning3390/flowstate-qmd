@@ -27,7 +27,7 @@ import {
   type IndexStatus,
   type HybridQueryResult,
 } from "../index.js";
-import { readIntuitionCache } from "../flow/engine.js";
+import { readIntuitionCache, loadTelemetry } from "../flow/engine.js";
 
 // =============================================================================
 // Types for structured content
@@ -578,6 +578,8 @@ Intent-aware lex (C++ performance, not sports):
     async () => {
       const status: StatusResult = await store.getStatus();
 
+      const flowTelemetry = loadTelemetry();
+
       const summary = [
         `QMD Index Status:`,
         `  Total documents: ${status.totalDocuments}`,
@@ -590,9 +592,15 @@ Intent-aware lex (C++ performance, not sports):
         summary.push(`    - ${col.path} (${col.documents} docs)`);
       }
 
+      summary.push(`  FlowState cache hits: ${flowTelemetry.cacheHits}`);
+      summary.push(`  FlowState cache misses: ${flowTelemetry.cacheMisses}`);
+      if (flowTelemetry.totalRefreshes > 0) {
+        summary.push(`  Avg refresh: ${Math.round(flowTelemetry.avgRefreshMs)}ms (${flowTelemetry.totalRefreshes} refreshes)`);
+      }
+
       return {
         content: [{ type: "text", text: summary.join('\n') }],
-        structuredContent: status,
+        structuredContent: { ...status, flowTelemetry },
       };
     }
   );

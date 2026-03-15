@@ -99,6 +99,7 @@ import {
 } from "../collections.js";
 import { getEmbeddedQmdSkillContent, getEmbeddedQmdSkillFiles } from "../embedded-skills.js";
 import { printBootstrapReport, runBootstrap } from "../bootstrap.js";
+import { loadTelemetry } from "../flow/engine.js";
 
 // Enable production mode - allows using default database path
 // Tests must set INDEX_PATH or use createStore() with explicit path
@@ -472,6 +473,20 @@ async function showStatus(): Promise<void> {
     console.log(`  CPU:      ${device.cpuCores} math cores`);
   } catch {
     // Don't fail status if LLM init fails
+  }
+
+  // FlowState telemetry
+  {
+    const ft = loadTelemetry();
+    if (ft.cacheHits > 0 || ft.cacheMisses > 0 || ft.totalRefreshes > 0) {
+      console.log(`\n${c.bold}FlowState${c.reset}`);
+      const total = ft.cacheHits + ft.cacheMisses;
+      const hitRate = total > 0 ? ((ft.cacheHits / total) * 100).toFixed(0) : "0";
+      console.log(`  Cache:      ${ft.cacheHits} hits / ${ft.cacheMisses} misses (${hitRate}% hit rate)`);
+      if (ft.totalRefreshes > 0) {
+        console.log(`  Refreshes:  ${ft.totalRefreshes} (avg ${Math.round(ft.avgRefreshMs)}ms)`);
+      }
+    }
   }
 
   // Tips section

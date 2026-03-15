@@ -4,6 +4,9 @@ import {
   setFlowEngineRuntimeForTests,
   startFlowEngine,
   updateIntuition,
+  getFlowTelemetry,
+  resetFlowTelemetry,
+  loadTelemetry,
 } from "../src/flow/engine.js";
 
 const mocks = {
@@ -68,7 +71,8 @@ describe("flow engine", () => {
     await updateIntuition("hello world context");
 
     expect(mocks.mkdirSyncMock).toHaveBeenCalledWith("/home/test/.cache/qmd", { recursive: true });
-    expect(mocks.writeFileSyncMock).toHaveBeenCalledTimes(1);
+    // writeFileSync is called twice: once for intuition cache .tmp, once for telemetry.json
+    expect(mocks.writeFileSyncMock).toHaveBeenCalledTimes(2);
     expect(mocks.renameSyncMock).toHaveBeenCalledWith(
       "/home/test/.cache/qmd/intuition.json.tmp",
       "/home/test/.cache/qmd/intuition.json"
@@ -111,7 +115,8 @@ describe("flow engine", () => {
     expect(mocks.openSyncMock).toHaveBeenCalledWith("/tmp/session.log", "r");
     expect(mocks.readSyncMock).toHaveBeenCalled();
     expect(mocks.hybridQueryMock).toHaveBeenCalledTimes(1);
-    expect(mocks.writeFileSyncMock).toHaveBeenCalledTimes(1);
+    // writeFileSync is called twice: once for intuition cache .tmp, once for telemetry.json
+    expect(mocks.writeFileSyncMock).toHaveBeenCalledTimes(2);
     expect(mocks.renameSyncMock).toHaveBeenCalledTimes(1);
   });
 
@@ -156,5 +161,156 @@ describe("flow engine", () => {
     mocks.readFileSyncMock.mockReturnValue("{not json");
 
     expect(readIntuitionCache()).toBeNull();
+  });
+
+  // ===========================================================================
+  // Telemetry tracking
+  // ===========================================================================
+
+  test("readIntuitionCache increments cacheHits on successful read", () => {
+    resetFlowTelemetry();
+    const cached = {
+      timestamp: Date.now(),
+      query: "test query",
+      memories: [],
+    };
+    mocks.existsSyncMock.mockReturnValue(true);
+    mocks.readFileSyncMock.mockReturnValue(JSON.stringify(cached));
+
+    readIntuitionCache();
+    readIntuitionCache();
+
+    const t = getFlowTelemetry();
+    expect(t.cacheHits).toBe(2);
+    expect(t.cacheMisses).toBe(0);
+    expect(t.lastHitAt).toBeTypeOf("number");
+  });
+
+  test("readIntuitionCache increments cacheMisses when file is missing", () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(false);
+
+    readIntuitionCache();
+
+    const t = getFlowTelemetry();
+    expect(t.cacheHits).toBe(0);
+    expect(t.cacheMisses).toBe(1);
+    expect(t.lastMissAt).toBeTypeOf("number");
+  });
+
+  test("readIntuitionCache increments cacheMisses on parse failure", () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(true);
+    mocks.readFileSyncMock.mockReturnValue("not-json");
+
+    readIntuitionCache();
+
+    const t = getFlowTelemetry();
+    expect(t.cacheHits).toBe(0);
+    expect(t.cacheMisses).toBe(1);
+  });
+
+  test("resetFlowTelemetry zeroes all counters", () => {
+    // Accumulate some hits
+    mocks.existsSyncMock.mockReturnValue(true);
+    mocks.readFileSyncMock.mockReturnValue(JSON.stringify({
+      timestamp: Date.now(), query: "q", memories: [],
+    }));
+    readIntuitionCache();
+
+    resetFlowTelemetry();
+    const t = getFlowTelemetry();
+    expect(t.cacheHits).toBe(0);
+    expect(t.cacheMisses).toBe(0);
+    expect(t.lastHitAt).toBeNull();
+    expect(t.lastMissAt).toBeNull();
+    expect(t.totalRefreshes).toBe(0);
+    expect(t.avgRefreshMs).toBe(0);
+  });
+
+  test("updateIntuition records refresh duration in telemetry", async () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(false);
+    mocks.hybridQueryMock.mockResolvedValue([]);
+
+    await updateIntuition("context for refresh test");
+
+    const t = getFlowTelemetry();
+    expect(t.totalRefreshes).toBe(1);
+    expect(t.avgRefreshMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test("updateIntuition persists telemetry to disk", async () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(false);
+    mocks.hybridQueryMock.mockResolvedValue([]);
+
+    await updateIntuition("persist telemetry test");
+
+    // writeFileSync is called twice: once for intuition cache (.tmp), once for telemetry
+    const telemetryCalls = mocks.writeFileSyncMock.mock.calls.filter(
+      (call: [string, string]) => String(call[0]).includes("telemetry.json"),
+    );
+    expect(telemetryCalls.length).toBe(1);
+
+    const written = JSON.parse(String(telemetryCalls[0]![1]));
+    expect(written.totalRefreshes).toBe(1);
+  });
+
+  test("updateIntuition accumulates avgRefreshMs over multiple calls", async () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(false);
+    mocks.hybridQueryMock.mockResolvedValue([]);
+
+    await updateIntuition("call 1");
+    await updateIntuition("call 2");
+
+    const t = getFlowTelemetry();
+    expect(t.totalRefreshes).toBe(2);
+    expect(t.avgRefreshMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test("loadTelemetry reads persisted telemetry from disk", () => {
+    const persisted = {
+      cacheHits: 42,
+      cacheMisses: 7,
+      lastHitAt: 1710000000000,
+      lastMissAt: 1710000001000,
+      totalRefreshes: 10,
+      avgRefreshMs: 55.5,
+    };
+    mocks.existsSyncMock.mockImplementation((p: string) =>
+      String(p).includes("telemetry.json"),
+    );
+    mocks.readFileSyncMock.mockReturnValue(JSON.stringify(persisted));
+
+    const loaded = loadTelemetry();
+    expect(loaded.cacheHits).toBe(42);
+    expect(loaded.cacheMisses).toBe(7);
+    expect(loaded.totalRefreshes).toBe(10);
+    expect(loaded.avgRefreshMs).toBe(55.5);
+  });
+
+  test("loadTelemetry returns defaults when file is missing", () => {
+    resetFlowTelemetry();
+    mocks.existsSyncMock.mockReturnValue(false);
+
+    const loaded = loadTelemetry();
+    expect(loaded.cacheHits).toBe(0);
+    expect(loaded.cacheMisses).toBe(0);
+    expect(loaded.totalRefreshes).toBe(0);
+  });
+
+  test("updateIntuition passes liteMode to hybridQuery", async () => {
+    mocks.existsSyncMock.mockReturnValue(false);
+    mocks.hybridQueryMock.mockResolvedValue([]);
+
+    await updateIntuition("lite mode test", true);
+
+    expect(mocks.hybridQueryMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lite mode test",
+      expect.objectContaining({ liteMode: true }),
+    );
   });
 });
