@@ -545,21 +545,53 @@ export class LlamaCpp implements LLM {
 
   /**
    * Initialize the llama instance (lazy)
+   *
+   * GPU handling:
+   * - If NODE_LLAMA_CPP_GPU=disable, force CPU mode
+   * - If GPU init or first model load fails (e.g. Metal memory in sandboxed env),
+   *   automatically fall back to CPU with a warning
    */
   private async ensureLlama(): Promise<Llama> {
     if (!this.llama) {
-      const llama = await getLlama({
-        // attempt to build
-        build: "autoAttempt",
-        logLevel: LlamaLogLevel.error
-      });
+      // Respect NODE_LLAMA_CPP_GPU env var for forced CPU mode
+      const gpuEnv = process.env.NODE_LLAMA_CPP_GPU;
+      const forceGpu = (gpuEnv === "disable" || gpuEnv === "false" || gpuEnv === "none")
+        ? false as const
+        : undefined;
 
-      if (llama.gpu === false) {
+      const initGpu = async (gpu: false | undefined): Promise<Llama> => {
+        return await getLlama({
+          build: "autoAttempt",
+          gpu,
+          logLevel: LlamaLogLevel.error,
+        });
+      };
+
+      try {
+        this.llama = await initGpu(forceGpu);
+      } catch (err: any) {
+        // If GPU mode failed and we weren't already forcing CPU, try CPU fallback
+        if (forceGpu !== false) {
+          const msg = String(err?.message ?? err);
+          if (/insufficient memory|metal|gpu|vram|command buffer/i.test(msg)) {
+            process.stderr.write(
+              "QMD Warning: GPU initialization failed, falling back to CPU mode. " +
+              `Error: ${msg.slice(0, 120)}\n`
+            );
+            this.llama = await initGpu(false);
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      if (this.llama.gpu === false) {
         process.stderr.write(
           "QMD Warning: no GPU acceleration, running on CPU (slow). Run 'qmd status' for details.\n"
         );
       }
-      this.llama = llama;
     }
     return this.llama;
   }

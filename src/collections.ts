@@ -108,7 +108,28 @@ function getConfigDir(): string {
   if (process.env.XDG_CONFIG_HOME) {
     return join(process.env.XDG_CONFIG_HOME, "qmd");
   }
-  return join(homedir(), ".config", "qmd");
+  // Default: ~/.config/qmd
+  // Fallback: ~/.qmd-config/qmd if ~/.config is not writable (e.g., root-owned on some systems)
+  const defaultDir = join(homedir(), ".config", "qmd");
+  try {
+    const configParent = join(homedir(), ".config");
+    if (!existsSync(configParent)) {
+      mkdirSync(configParent, { recursive: true });
+    }
+    // Test writability
+    const testFile = join(configParent, ".qmd_write_test");
+    writeFileSync(testFile, "");
+    const { unlinkSync } = require("fs");
+    unlinkSync(testFile);
+    return defaultDir;
+  } catch {
+    // ~/.config not writable — fall back to user-owned location
+    const fallbackDir = join(homedir(), ".qmd-config", "qmd");
+    if (!existsSync(fallbackDir)) {
+      mkdirSync(fallbackDir, { recursive: true });
+    }
+    return fallbackDir;
+  }
 }
 
 function getConfigFilePath(): string {
