@@ -141,7 +141,7 @@ export function checkDuplicateDocument(
     const similarity = 1 - distance;
     if (similarity < threshold) continue;
 
-    const hash = hash_seq.split("_")[0];
+    const hash = hash_seq.split("_")[0] ?? hash_seq;
     const doc = db.prepare(`
       SELECT d.path
       FROM documents d
