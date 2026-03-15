@@ -98,6 +98,7 @@ import {
   loadConfig,
 } from "../collections.js";
 import { getEmbeddedQmdSkillContent, getEmbeddedQmdSkillFiles } from "../embedded-skills.js";
+import { printBootstrapReport, runBootstrap } from "../bootstrap.js";
 
 // Enable production mode - allows using default database path
 // Tests must set INDEX_PATH or use createStore() with explicit path
@@ -334,6 +335,7 @@ async function showStatus(): Promise<void> {
     ? resolve(process.env.XDG_CACHE_HOME, "qmd")
     : resolve(homedir(), ".cache", "qmd");
   const mcpPidPath = resolve(mcpCacheDir, "mcp.pid");
+  const bootstrapReportPath = resolve(mcpCacheDir, "bootstrap-report.json");
   if (existsSync(mcpPidPath)) {
     const mcpPid = parseInt(readFileSync(mcpPidPath, "utf-8").trim());
     try {
@@ -342,6 +344,22 @@ async function showStatus(): Promise<void> {
     } catch {
       unlinkSync(mcpPidPath);
       // Stale PID file cleaned up silently
+    }
+  }
+  if (existsSync(bootstrapReportPath)) {
+    try {
+      const report = JSON.parse(readFileSync(bootstrapReportPath, "utf-8")) as {
+        readiness?: string;
+        selectedProfile?: { name?: string };
+      };
+      if (report.readiness) {
+        console.log(`Ready: ${report.readiness}`);
+      }
+      if (report.selectedProfile?.name) {
+        console.log(`Mode:  ${report.selectedProfile.name}`);
+      }
+    } catch {
+      // Ignore malformed bootstrap reports in status output
     }
   }
   console.log("");
@@ -2342,6 +2360,11 @@ function parseCLI() {
       skill: { type: "boolean" },
       global: { type: "boolean" },
       yes: { type: "boolean" },
+      "check-only": { type: "boolean" },
+      repair: { type: "boolean" },
+      profile: { type: "string" },
+      target: { type: "string" },
+      transport: { type: "string" },
       // Search options
       n: { type: "string" },
       "min-score": { type: "string" },
@@ -2377,6 +2400,7 @@ function parseCLI() {
       http: { type: "boolean" },
       daemon: { type: "boolean" },
       port: { type: "string" },
+      watch: { type: "string" },
     },
     allowPositionals: true,
     strict: false, // Allow unknown options to pass through
@@ -2423,6 +2447,18 @@ function parseCLI() {
     opts,
     values,
   };
+}
+
+function resolveFlowTarget(cli: ReturnType<typeof parseCLI>): string | null {
+  if (cli.values.watch && typeof cli.values.watch === "string") {
+    return cli.values.watch;
+  }
+
+  if (cli.args[0] === "start") {
+    return cli.args[1] || null;
+  }
+
+  return cli.args[0] || null;
 }
 
 function getSkillInstallDir(globalInstall: boolean): string {
@@ -2552,25 +2588,28 @@ async function installSkill(globalInstall: boolean, force: boolean, autoYes: boo
 }
 
 function showHelp(): void {
-  console.log("qmd — Quick Markdown Search");
+  console.log("qmd — FlowState-QMD for coding agents");
   console.log("");
   console.log("Usage:");
   console.log("  qmd <command> [options]");
   console.log("");
-console.log("Primary commands:");
-  console.log("  qmd query <query>             - Hybrid search with auto expansion + reranking (recommended)");
+  console.log("Primary commands:");
+  console.log("  qmd query <query>             - Hybrid project-memory search with auto expansion + reranking");
   console.log("  qmd query 'lex:..\\\\nvec:...'   - Structured query document (you provide lex/vec/hyde lines)");
-  console.log("  qmd search <query>            - Full-text BM25 keywords (no LLM)");
+  console.log("  qmd search <query>            - Full-text BM25 over repo notes, specs, and docs");
   console.log("  qmd vsearch <query>           - Vector similarity only");
   console.log("  qmd get <file>[:line] [-l N]  - Show a single document, optional line slice");
   console.log("  qmd multi-get <pattern>       - Batch fetch via glob or comma-separated list");
-  console.log("  qmd skill show/install        - Show or install the packaged QMD skill");
-  console.log("  qmd mcp                       - Start the MCP server (stdio transport for AI agents)");
-  console.log("  qmd flow <targetFile>         - Start FlowEngine for anticipatory memory (--lite for low VRAM)");
-  console.log("  qmd init - Initialize FlowState-QMD as default memory system");
+  console.log("  qmd flow <targetFile>         - Start FlowState anticipatory memory (--lite for low VRAM)");
+  console.log("  qmd flow start --watch <file> - Compatibility alias for the FlowState watcher");
+  console.log("  qmd mcp                       - Start the MCP server (stdio transport for coding agents)");
+  console.log("  qmd skill show/install        - Show or install the packaged coding-agent memory skill");
+  console.log("  qmd init                      - Bootstrap FlowState-QMD for Hermes and other MCP clients");
+  console.log("  qmd doctor                    - Verify host, runtime, and wrapper readiness");
   console.log("");
   console.log("Collections & context:");
   console.log("  qmd collection add/list/remove/rename/show   - Manage indexed folders");
+  console.log("  qmd index <path>                              - Compatibility alias for collection add");
   console.log("  qmd context add/list/rm                      - Attach human-written summaries");
   console.log("  qmd ls [collection[/path]]                   - Inspect indexed files");
   console.log("");
@@ -2617,11 +2656,13 @@ console.log("Primary commands:");
   console.log("    - Each typed line must be single-line text with balanced quotes.");
   console.log("");
   console.log("AI agents & integrations:");
-  console.log("  - Run `qmd mcp` to expose the MCP server (stdio) to agents/IDEs.");
-  console.log("  - `qmd skill install` installs the QMD skill into ./.agents/skills/qmd.");
+  console.log("  - Run `qmd mcp` to expose shared project memory to coding agents and IDEs.");
+  console.log("  - Call `fetch_anticipatory_context` first when the agent has recent turn context.");
+  console.log("  - `qmd skill install` installs the packaged QMD skill into ./.agents/skills/qmd.");
   console.log("  - Use `qmd skill install --global` for ~/.agents/skills/qmd.");
   console.log("  - `qmd --skill` is kept as an alias for `qmd skill show`.");
   console.log("  - Advanced: `qmd mcp --http ...` and `qmd mcp --http --daemon` are optional for custom transports.");
+  console.log("  - `qmd init --target all` emits Hermes, Claude Code, Codex, Gemini, Kiro, and VS Code config files.");
   console.log("");
   console.log("Global options:");
   console.log("  --index <name>             - Use a named index (default: index)");
@@ -2698,10 +2739,12 @@ if (isMain) {
 
   if (cli.values.help && cli.command === "flow") {
     console.log("Usage: qmd flow <targetFile> [options]");
+    console.log("   or: qmd flow start --watch <targetFile> [options]");
     console.log("");
     console.log("Start the FlowEngine to monitor agent sessions contextually");
     console.log("");
     console.log("Options:");
+    console.log("  --watch <file>  Compatibility alias for passing the target file");
     console.log("  --lite   Run in ultra-lite mode using ~0.8B models for low VRAM consumption");
     process.exit(0);
   }
@@ -2715,9 +2758,10 @@ if (isMain) {
 
     case "flow": {
       const { startFlowEngine } = await import("../flow/engine.js");
-      const targetFile = cli.args[0];
+      const targetFile = resolveFlowTarget(cli);
       if (!targetFile) {
         console.error(`Usage: qmd flow <targetFile>`);
+        console.error(`   or: qmd flow start --watch <targetFile>`);
         process.exit(1);
       }
 
@@ -2737,11 +2781,57 @@ if (isMain) {
         console.log(`[FLOW] Running in LITE MODE (0.8B models)`);
       }
 
-      await startFlowEngine(resolve(targetFile), isLite);
+      try {
+        await startFlowEngine(resolve(targetFile), isLite);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+      break;
+    }
+    case "index": {
+      const pwd = cli.args[0] || getPwd();
+      const resolvedPwd = pwd === "." ? getPwd() : getRealPath(resolve(pwd));
+      const globPattern = cli.values.mask as string || DEFAULT_GLOB;
+      const name = cli.values.name as string | undefined;
+
+      await collectionAdd(resolvedPwd, globPattern, name);
       break;
     }
     case "init": {
-      await initializeSystem();
+      const report = await runBootstrap({
+        cwd: getPwd(),
+        target: typeof cli.values.target === "string" ? cli.values.target : "hermes",
+        profile: typeof cli.values.profile === "string" ? cli.values.profile : undefined,
+        transport: cli.values.transport === "http" ? "http" : "stdio",
+        port: Number(cli.values.port) || 8181,
+        checkOnly: Boolean(cli.values["check-only"]),
+        yes: Boolean(cli.values.yes),
+        repair: Boolean(cli.values.repair),
+        json: Boolean(cli.values.json),
+        cliEntrypoint: fileURLToPath(import.meta.url),
+        ensureSkillInstalled: async () => {
+          await installSkill(true, Boolean(cli.values.force), true);
+        },
+      });
+      printBootstrapReport(report, Boolean(cli.values.json));
+      break;
+    }
+
+    case "doctor": {
+      const report = await runBootstrap({
+        cwd: getPwd(),
+        target: typeof cli.values.target === "string" ? cli.values.target : "hermes",
+        profile: typeof cli.values.profile === "string" ? cli.values.profile : undefined,
+        transport: cli.values.transport === "http" ? "http" : "stdio",
+        port: Number(cli.values.port) || 8181,
+        checkOnly: true,
+        yes: Boolean(cli.values.yes),
+        repair: Boolean(cli.values.repair),
+        json: Boolean(cli.values.json),
+        cliEntrypoint: fileURLToPath(import.meta.url),
+      });
+      printBootstrapReport(report, Boolean(cli.values.json));
       break;
     }
 
@@ -3229,90 +3319,5 @@ if (isMain) {
     await disposeDefaultLlamaCpp();
     process.exit(0);
   }
-
-
-async function initializeSystem(): Promise<void> {
-  // Step 1: Install the QMD skill globally (if not already)
-  console.log("Installing QMD skill globally...");
-  await installSkill(true, true, true);
-
-  // Step 2: Start MCP server as daemon (if not already running)
-  console.log("Starting MCP server as daemon...");
-  const cacheDir = process.env.XDG_CACHE_HOME || resolve(homedir(), '.cache');
-  const mcpCacheDir = resolve(cacheDir, 'qmd');
-  const pidPath = resolve(mcpCacheDir, 'mcp.pid');
-  
-  // Check if already running
-  if (existsSync(pidPath)) {
-    const pid = parseInt(readFileSync(pidPath, 'utf-8').trim());
-    try {
-      process.kill(pid, 0); // Check if process exists
-      console.log(`MCP server already running (PID ${pid})`);
-      return; // Already running, no need to start again
-    } catch {
-      // Process not running, remove stale pid file
-      unlinkSync(pidPath);
-    }
-  }
-
-  // If not running, start it
-  const port = 8181;
-  const logPath = resolve(mcpCacheDir, "mcp.log");
-  const logFd = openSync(logPath, "w");
-  const selfPath = fileURLToPath(import.meta.url);
-  const spawnArgs = selfPath.endsWith(".ts")
-    ? ["--import", pathJoin(dirname(selfPath), "..", "..", "node_modules", "tsx", "dist", "esm", "index.mjs"), selfPath, "mcp", "--http", "--port", String(port)]
-    : [selfPath, "mcp", "--http", "--port", String(port)];
-  const child = nodeSpawn(process.execPath, spawnArgs, {
-    stdio: ["ignore", logFd, logFd],
-    detached: true,
-  });
-  child.unref();
-  closeSync(logFd);
-
-  writeFileSync(pidPath, String(child.pid));
-  console.log(`MCP server started on http://localhost:${port}/mcp (PID ${child.pid})`);
-
-  // Step 3: Create configuration file for agents (in cache directory)
-  const configPath = resolve(mcpCacheDir, 'agent-config.json');
-  
-  const config = {
-    mcp_servers: {
-      'flowstate-qmd': {
-        url: `http://localhost:${port}`,
-        transport: 'http',
-        description: 'FlowState-QMD: Anticipatory Memory for AI Agents',
-      },
-    },
-    default_memory: 'flowstate-qmd',
-    auto_connect: true,
-    instructions: 'Connect to FlowState-QMD MCP server at startup for anticipatory memory.',
-  };
-  
-  writeFileSync(configPath, JSON.stringify(config, null, 2));
-  console.log(`Agent configuration saved to: ${configPath}`);
-
-  // Step 4: Create a startup script (in cache directory)
-  const scriptPath = resolve(mcpCacheDir, 'start-flowstate.sh');
-  const scriptContent = `#!/bin/bash
-# Start FlowState-QMD MCP server for agent memory
-qmd mcp --http --daemon --port ${port}
-# Wait a moment for server to start
-sleep 2
-# Output connection info
-echo "FlowState-QMD MCP server running on http://localhost:${port}"
-echo "Use fetch_anticipatory_context tool for anticipatory memory"
-`;
-  writeFileSync(scriptPath, scriptContent);
-  // Make executable
-  await new Promise((resolve, reject) => {
-    nodeSpawn('chmod', ['+x', scriptPath]).on('close', resolve);
-  });
-  console.log(`Startup script created: ${scriptPath}`);
-
-  console.log('\n✅ FlowState-QMD is now set as default memory system!');
-  console.log('\nAgents can now connect via MCP to: http://localhost:' + port);
-  console.log('Use the \'fetch_anticipatory_context\' tool for instant memory retrieval.');
-}
 
 } // end if (main module)

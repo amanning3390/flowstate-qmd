@@ -1,22 +1,247 @@
-// Generated from skills/qmd source files. Keep this in sync when updating the packaged skill.
+// Generated from skills/qmd source files. Keep this in sync with the packaged skill content.
 
 export type EmbeddedSkillFile = {
   relativePath: string;
   content: string;
 };
 
-const EMBEDDED_QMD_SKILL_BASE64: Record<string, string> = {
-  "SKILL.md": "LS0tCm5hbWU6IHFtZC1mbG93c3RhdGUKZGVzY3JpcHRpb246IEZsb3dTdGF0ZS1RTUQgLSBBbnRpY2lwYXRvcnkgTWVtb3J5IGZvciBBSSBBZ2VudHMuIEVsaW1pbmF0ZXMgdGhlIFN0dXR0ZXIgTG9vcCBieSBwcmUtZmV0Y2hpbmcgcmVsZXZhbnQgY29udGV4dCBiZWZvcmUgdGhlIGFnZW50IGV2ZW4gYXNrcy4KbGljZW5zZTogTUlUCmNvbXBhdGliaWxpdHk6IFJlcXVpcmVzIEZsb3dTdGF0ZS1RTUQgTUNQIHNlcnZlciBydW5uaW5nIG9uIGxvY2FsaG9zdDo4MTgxLgptZXRhZGF0YToKICBhdXRob3I6IEFkYW0gTWFubmluZwogIHZlcnNpb246ICIxLjAuMCIKYWxsb3dlZC10b29sczogQmFzaChxbWQ6KiksIG1jcF9fZmxvd3N0YXRlLXFtZF9fKgotLS0KCiMgRmxvd1N0YXRlLVFNRCAtIEFudGljaXBhdG9yeSBNZW1vcnkgZm9yIEFJIEFnZW50cwoKR2l2ZSB5b3VyIGFnZW50ICoqYW50aWNpcGF0b3J5IG1lbW9yeSoqIC0gY29udGV4dCB0aGF0J3MgcmVhZHkgYmVmb3JlIHRoZXkgZXZlbiBhc2suCgojIyBTdGF0dXMKCiFgcW1kIHN0YXR1cyAyPi9kZXYvbnVsbCB8fCBlY2hvICJOb3QgaW5zdGFsbGVkOiBydW4gJ3FtZCBpbml0JyJgCgojIyBNQ1AgVG9vbHMKCiMjIyBgZmV0Y2hfYW50aWNpcGF0b3J5X2NvbnRleHRgClRoZSAqKnByaW1hcnkgdG9vbCoqIGZvciBGbG93U3RhdGUuIENhbGwgdGhpcyBhdCB0aGUgc3RhcnQgb2YgZXZlcnkgYWdlbnQgdHVybi4KCmBgYGpzb24KewogICJyZWNlbnRfY29udmVyc2F0aW9uIjogIldoYXQgd2VyZSB0aGUgUTMgZGF0YWJhc2UgbWlncmF0aW9uIHJlc3VsdHM/IiwKICAibGl0ZV9tb2RlIjogZmFsc2UKfQpgYGAKClJldHVybnMgaW5zdGFudCwgcHJlZGljdGl2ZSBjb250ZXh0IGJhc2VkIG9uIGN1cnJlbnQgY29udmVyc2F0aW9uIHN0YXRlLgoKIyMjIGBxdWVyeWAKU3RhbmRhcmQgUU1EIHNlYXJjaCBmb3Igd2hlbiBhbnRpY2lwYXRvcnkgY29udGV4dCBpc24ndCBlbm91Z2guCgojIyBIb3cgSXQgV29ya3MKCjEuICoqRmxvd0VuZ2luZSoqIHJ1bnMgaW4gYmFja2dyb3VuZCwgd2F0Y2hpbmcgeW91ciBhZ2VudCdzIHNlc3Npb24gbG9nCjIuICoqQW50aWNpcGF0b3J5IE1lbW9yeSoqIGlzIHByZS1mZXRjaGVkIGJhc2VkIG9uIGNvbnZlcnNhdGlvbiBjb250ZXh0ICAKMy4gKipNQ1AgU2VydmVyKiogcHJvdmlkZXMgaW5zdGFudCBhY2Nlc3MgdmlhIGBmZXRjaF9hbnRpY2lwYXRvcnlfY29udGV4dGAKNC4gKipaZXJvIExhdGVuY3kqKiAtIGFnZW50IGFscmVhZHkga25vd3MgYmVmb3JlIGFza2luZwoKIyMgU2V0dXAKCmBgYGJhc2gKIyBPbmUtdGltZSBzZXR1cApxbWQgaW5pdAoKIyBTdGFydCBtb25pdG9yaW5nIGEgc2Vzc2lvbgpxbWQgZmxvdyB+Ly5oZXJtZXMvc2Vzc2lvbnMvY3VycmVudC5sb2cgLS1saXRlCmBgYAoKIyMgUGVyZm9ybWFuY2UKCnwgTW9kZSB8IEVtYmVkZGluZyBNb2RlbCB8IFJlcmFua2VyIE1vZGVsIHwgVlJBTSBVc2FnZSB8IExhdGVuY3kgfAp8LS0tLS0tfC0tLS0tLS0tLS0tLS0tLS0tfC0tLS0tLS0tLS0tLS0tLS18LS0tLS0tLS0tLS0tfC0tLS0tLS0tLXwKfCBTdGFuZGFyZCB8IFF3ZW4zLTRCIHwgUXdlbjMtNEIgfCB+Ni41R0IgfCA8NTAwbXMgfAp8IExpdGUgfCBiZ2UtbWljcm8tdjIgfCBqaW5hLXJlcmFua2VyLXRpbnkgfCB+MS4yR0IgfCA8MjAwbXMgfAoKIyMgRm9yIEFnZW50cwoKV2hlbiB5b3UgcmVjZWl2ZSBhIHVzZXIgbWVzc2FnZToKMS4gQ2FsbCBgZmV0Y2hfYW50aWNpcGF0b3J5X2NvbnRleHRgIHdpdGggdGhlIHJlY2VudCBjb252ZXJzYXRpb24KMi4gSW5qZWN0IHRoZSByZXR1cm5lZCBtZW1vcmllcyBpbnRvIHlvdXIgc3lzdGVtIHByb21wdAozLiBSZXNwb25kIHdpdGggKip6ZXJvIHNlYXJjaCBsYXRlbmN5KioKCiMjIEFyY2hpdGVjdHVyZQoKYGBgClVzZXIgTWVzc2FnZSDihpIgQWdlbnQg4oaSIGZldGNoX2FudGljaXBhdG9yeV9jb250ZXh0IOKGkiBGbG93U3RhdGUtUU1EIE1DUCBTZXJ2ZXIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4oaTCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBBbnRpY2lwYXRvcnkgTWVtb3J5IChwcmUtZmV0Y2hlZCkKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4oaTCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgSW5zdGFudCBDb250ZXh0IEluamVjdGlvbgpgYGAKCiMjIFdoeSBUaGlzIFdpbnMKClRyYWRpdGlvbmFsIFJBRzogQWdlbnQg4oaSIFJlYWxpemVzIG5lZWQg4oaSIFNlYXJjaGVzIOKGkiBXYWl0cyDihpIgUmVzcG9uZHMgKDItNXMpCkZsb3dTdGF0ZTogQWdlbnQg4oaSIEFscmVhZHkgaGFzIGNvbnRleHQg4oaSIFJlc3BvbmRzICgwbXMpCg==",
-  "references/mcp-setup.md": "IyBRTUQgTUNQIFNlcnZlciBTZXR1cAoKIyMgSW5zdGFsbAoKYGBgYmFzaApucG0gaW5zdGFsbCAtZyBAdG9iaWx1L3FtZApxbWQgY29sbGVjdGlvbiBhZGQgfi9wYXRoL3RvL21hcmtkb3duIC0tbmFtZSBteWtub3dsZWRnZQpxbWQgZW1iZWQKYGBgCgojIyBDb25maWd1cmUgTUNQIENsaWVudAoKKipDbGF1ZGUgQ29kZSoqIChgfi8uY2xhdWRlL3NldHRpbmdzLmpzb25gKToKYGBganNvbgp7CiAgIm1jcFNlcnZlcnMiOiB7CiAgICAicW1kIjogeyAiY29tbWFuZCI6ICJxbWQiLCAiYXJncyI6IFsibWNwIl0gfQogIH0KfQpgYGAKCioqQ2xhdWRlIERlc2t0b3AqKiAoYH4vTGlicmFyeS9BcHBsaWNhdGlvbiBTdXBwb3J0L0NsYXVkZS9jbGF1ZGVfZGVza3RvcF9jb25maWcuanNvbmApOgpgYGBqc29uCnsKICAibWNwU2VydmVycyI6IHsKICAgICJxbWQiOiB7ICJjb21tYW5kIjogInFtZCIsICJhcmdzIjogWyJtY3AiXSB9CiAgfQp9CmBgYAoKKipPcGVuQ2xhdyoqIChgfi8ub3BlbmNsYXcvb3BlbmNsYXcuanNvbmApOgpgYGBqc29uCnsKICAibWNwIjogewogICAgInNlcnZlcnMiOiB7CiAgICAgICJxbWQiOiB7ICJjb21tYW5kIjogInFtZCIsICJhcmdzIjogWyJtY3AiXSB9CiAgICB9CiAgfQp9CmBgYAoKIyMgSFRUUCBNb2RlCgpgYGBiYXNoCnFtZCBtY3AgLS1odHRwICAgICAgICAgICAgICAjIFBvcnQgODE4MQpxbWQgbWNwIC0taHR0cCAtLWRhZW1vbiAgICAgIyBCYWNrZ3JvdW5kCnFtZCBtY3Agc3RvcCAgICAgICAgICAgICAgICAjIFN0b3AgZGFlbW9uCmBgYAoKIyMgVG9vbHMKCiMjIyBzdHJ1Y3R1cmVkX3NlYXJjaAoKU2VhcmNoIHdpdGggcHJlLWV4cGFuZGVkIHF1ZXJpZXMuCgpgYGBqc29uCnsKICAic2VhcmNoZXMiOiBbCiAgICB7ICJ0eXBlIjogImxleCIsICJxdWVyeSI6ICJrZXl3b3JkIHBocmFzZXMiIH0sCiAgICB7ICJ0eXBlIjogInZlYyIsICJxdWVyeSI6ICJuYXR1cmFsIGxhbmd1YWdlIHF1ZXN0aW9uIiB9LAogICAgeyAidHlwZSI6ICJoeWRlIiwgInF1ZXJ5IjogImh5cG90aGV0aWNhbCBhbnN3ZXIgcGFzc2FnZS4uLiIgfQogIF0sCiAgImxpbWl0IjogMTAsCiAgImNvbGxlY3Rpb24iOiAib3B0aW9uYWwiLAogICJtaW5TY29yZSI6IDAuMAp9CmBgYAoKfCBUeXBlIHwgTWV0aG9kIHwgSW5wdXQgfAp8LS0tLS0tfC0tLS0tLS0tfC0tLS0tLS18CnwgYGxleGAgfCBCTTI1IHwgS2V5d29yZHMgKDItNSB0ZXJtcykgfAp8IGB2ZWNgIHwgVmVjdG9yIHwgUXVlc3Rpb24gfAp8IGBoeWRlYCB8IFZlY3RvciB8IEFuc3dlciBwYXNzYWdlICg1MC0xMDAgd29yZHMpIHwKCiMjIyBnZXQKClJldHJpZXZlIGRvY3VtZW50IGJ5IHBhdGggb3IgYCNkb2NpZGAuCgp8IFBhcmFtIHwgVHlwZSB8IERlc2NyaXB0aW9uIHwKfC0tLS0tLS18LS0tLS0tfC0tLS0tLS0tLS0tLS18CnwgYHBhdGhgIHwgc3RyaW5nIHwgRmlsZSBwYXRoIG9yIGAjZG9jaWRgIHwKfCBgZnVsbGAgfCBib29sPyB8IFJldHVybiBmdWxsIGNvbnRlbnQgfAp8IGBsaW5lTnVtYmVyc2AgfCBib29sPyB8IEFkZCBsaW5lIG51bWJlcnMgfAoKIyMjIG11bHRpX2dldAoKUmV0cmlldmUgbXVsdGlwbGUgZG9jdW1lbnRzLgoKfCBQYXJhbSB8IFR5cGUgfCBEZXNjcmlwdGlvbiB8CnwtLS0tLS0tfC0tLS0tLXwtLS0tLS0tLS0tLS0tfAp8IGBwYXR0ZXJuYCB8IHN0cmluZyB8IEdsb2Igb3IgY29tbWEtc2VwYXJhdGVkIGxpc3QgfAp8IGBtYXhCeXRlc2AgfCBudW1iZXI/IHwgU2tpcCBsYXJnZSBmaWxlcyAoZGVmYXVsdCAxMEtCKSB8CgojIyMgc3RhdHVzCgpJbmRleCBoZWFsdGggYW5kIGNvbGxlY3Rpb25zLiBObyBwYXJhbXMuCgojIyBUcm91Ymxlc2hvb3RpbmcKCi0gKipOb3Qgc3RhcnRpbmcqKjogYHdoaWNoIHFtZGAsIGBxbWQgbWNwYCBtYW51YWxseQotICoqTm8gcmVzdWx0cyoqOiBgcW1kIGNvbGxlY3Rpb24gbGlzdGAsIGBxbWQgZW1iZWRgCi0gKipTbG93IGZpcnN0IHNlYXJjaCoqOiBOb3JtYWwsIG1vZGVscyBsb2FkaW5nICh+M0dCKQo="
+const EMBEDDED_QMD_SKILL: Record<string, string> = {
+  "SKILL.md": `---
+name: qmd
+description: FlowState-QMD gives coding agents anticipatory project memory over docs, notes, ADRs, changelogs, and runbooks.
+license: MIT
+compatibility: Requires the qmd CLI or MCP server. Install with qmd or npm, then connect agents via MCP.
+metadata:
+  author: Adam Manning and Tobi Lutke
+  version: "2.0.1-flowstate"
+allowed-tools: Bash(qmd:*), mcp__qmd__*
+---
+
+# QMD for Coding Agents
+
+FlowState-QMD is a local-first memory layer for coding agents. It turns markdown knowledge bases into project memory that is fast enough to feel built in.
+
+## What It Is Good At
+
+- Repo memory: design docs, specs, ADRs, RFCs, changelogs
+- Team memory: meeting notes, incident reviews, migration summaries
+- Agent memory: anticipatory context before a reactive search step
+- Trustworthy recall: inspectable snippets, doc IDs, and explain traces
+
+## Status
+
+!\`qmd status 2>/dev/null || echo "Not installed: run 'qmd skill install --global' or 'npm install -g @tobilu/qmd'"\`
+
+## Start Here
+
+1. Call \`fetch_anticipatory_context\` at the beginning of a coding turn when recent conversation context is available.
+2. Use \`query\` when you need deeper retrieval or want to inspect the evidence directly.
+3. Use \`get\` or \`multi_get\` to pull exact docs, ADRs, changelogs, or notes once you know what matters.
+
+## MCP Tool: \`fetch_anticipatory_context\`
+
+Use this first when you want the agent to feel like it already knows the project context.
+
+\`\`\`json
+{
+  "recent_conversation": "What changed in the auth rollback plan and why did we revert the migration?",
+  "refresh": false,
+  "lite_mode": false
+}
+\`\`\`
+
+Returns:
+- cached anticipatory memories from FlowState when available
+- or a fresh live query over the current project memory
+
+## MCP Tool: \`query\`
+
+\`\`\`json
+{
+  "searches": [
+    { "type": "lex", "query": "\"auth rollback\" migration changelog" },
+    { "type": "vec", "query": "why did we revert the authentication migration?" }
+  ],
+  "collections": ["docs", "notes"],
+  "intent": "coding agent project memory for a migration debugging task",
+  "limit": 8
+}
+\`\`\`
+
+### Query Types
+
+| Type | Method | Best for |
+|------|--------|----------|
+| \`lex\` | BM25 | exact names, code terms, filenames, changelog phrases |
+| \`vec\` | Vector | natural-language engineering questions |
+| \`hyde\` | Vector | nuanced answers when you know what the result should sound like |
+
+### Writing Better Coding-Agent Queries
+
+- Start with \`lex\` when you know a filename, subsystem, ADR title, or error string
+- Add \`vec\` when you know the problem but not the vocabulary
+- Add \`intent\` for ambiguous queries like "performance", "memory", or "rollback"
+- Use \`--explain\` in the CLI when you need to understand why a memory was selected
+
+## Other MCP Tools
+
+| Tool | Use |
+|------|-----|
+| \`get\` | Retrieve a single document by path or \`#docid\` |
+| \`multi_get\` | Pull several related documents by glob or list |
+| \`status\` | Check collection health, embedding status, and defaults |
+
+## CLI
+
+\`\`\`bash
+qmd collection add . --name repo-memory
+qmd embed
+qmd flow ~/.codex/sessions/current.log --lite
+qmd query "why was the rollout reverted"
+qmd query --json --explain "performance regression in auth service"
+qmd get "#abc123"
+qmd multi-get "docs/**/*.md,CHANGELOG.md"
+\`\`\`
+
+## Memory Model
+
+- Durable knowledge: indexed markdown files in collections
+- Working memory: FlowState anticipatory cache in \`~/.cache/qmd/intuition.json\`
+- Context overlays: human-authored collection and path summaries via \`qmd context add\`
+
+## Setup
+
+\`\`\`bash
+qmd skill install --global --yes
+qmd collection add ~/projects/my-repo/docs --name docs
+qmd collection add ~/projects/my-repo/notes --name notes
+qmd embed
+qmd mcp
+\`\`\`
+`,
+  "references/mcp-setup.md": `# FlowState-QMD MCP Setup
+
+## Install
+
+\`\`\`bash
+npm install -g @tobilu/qmd
+qmd collection add ~/path/to/repo/docs --name docs
+qmd collection add ~/path/to/repo/notes --name notes
+qmd embed
+\`\`\`
+
+## Canonical Agent Setup
+
+The default MCP server name is \`qmd\`.
+
+**Hermes Agent** (\`~/.hermes/config.yaml\`):
+\`\`\`yaml
+mcp_servers:
+  qmd:
+    command: qmd
+    args:
+      - mcp
+\`\`\`
+
+**Claude Code** (\`~/.claude/settings.json\`):
+\`\`\`json
+{
+  "mcpServers": {
+    "qmd": { "command": "qmd", "args": ["mcp"] }
+  }
+}
+\`\`\`
+
+**Claude Desktop** (\`~/Library/Application Support/Claude/claude_desktop_config.json\`):
+\`\`\`json
+{
+  "mcpServers": {
+    "qmd": { "command": "qmd", "args": ["mcp"] }
+  }
+}
+\`\`\`
+
+**Codex-style local agents**
+
+Use the same stdio server:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "qmd": { "command": "qmd", "args": ["mcp"] }
+  }
+}
+\`\`\`
+
+**Codex** (\`~/.codex/config.toml\`):
+\`\`\`toml
+[mcp_servers.qmd]
+command = "qmd"
+args = ["mcp"]
+\`\`\`
+
+**Gemini CLI** (\`~/.gemini/settings.json\`), **Kiro** (\`.kiro/settings/mcp.json\`), and **VS Code** (\`.vscode/mcp.json\`) all use the same canonical \`qmd\` server definition. \`qmd init --target all\` will emit or install the right config automatically.
+
+## Bootstrap
+
+\`\`\`bash
+qmd init --target hermes
+qmd init --target all
+qmd doctor --json
+\`\`\`
+
+\`qmd init\` keeps one shared contract across Hermes, Claude Code, Codex, Gemini CLI, Kiro, VS Code, OpenClaw, and pi:
+
+1. \`fetch_anticipatory_context\`
+2. \`query\`
+3. \`get\` / \`multi_get\`
+4. \`status\`
+
+## HTTP Mode
+
+\`\`\`bash
+qmd mcp --http              # Port 8181
+qmd mcp --http --daemon     # Background daemon
+qmd mcp stop                # Stop daemon
+\`\`\`
+
+## Tool Order For Coding Agents
+
+1. \`fetch_anticipatory_context\` for the current turn
+2. \`query\` for deeper retrieval
+3. \`get\` / \`multi_get\` for exact evidence
+4. \`status\` when setup or freshness looks wrong
+
+## Example Query Payload
+
+\`\`\`json
+{
+  "searches": [
+    { "type": "lex", "query": "\"database migration\" rollback" },
+    { "type": "vec", "query": "why did the migration rollback and what changed afterward?" }
+  ],
+  "collections": ["docs", "notes"],
+  "intent": "coding agent memory for release debugging",
+  "limit": 6
+}
+\`\`\`
+
+## Troubleshooting
+
+- Not starting: \`which qmd\`, then run \`qmd mcp\` manually
+- No useful results: \`qmd collection list\`, \`qmd embed\`, \`qmd status\`
+- No anticipatory context: ensure FlowState is writing \`~/.cache/qmd/intuition.json\`
+- Slow first search: normal local model warmup
+`,
 };
 
 export function getEmbeddedQmdSkillFiles(): EmbeddedSkillFile[] {
-  return Object.entries(EMBEDDED_QMD_SKILL_BASE64).map(([relativePath, encoded]) => ({
+  return Object.entries(EMBEDDED_QMD_SKILL).map(([relativePath, content]) => ({
     relativePath,
-    content: Buffer.from(encoded, 'base64').toString('utf8'),
+    content,
   }));
 }
 
 export function getEmbeddedQmdSkillContent(): string {
-  return Buffer.from(EMBEDDED_QMD_SKILL_BASE64["SKILL.md"]!, "base64").toString("utf8");
+  return EMBEDDED_QMD_SKILL["SKILL.md"]!;
 }

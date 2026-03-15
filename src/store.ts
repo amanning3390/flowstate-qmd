@@ -3674,6 +3674,7 @@ export interface HybridQueryOptions {
   explain?: boolean;        // include backend/RRF/rerank score traces
   intent?: string;          // domain intent hint for disambiguation
   skipRerank?: boolean;     // skip LLM reranking, use only RRF scores
+  liteMode?: boolean;       // FlowState hint for lightweight anticipatory refreshes
   hooks?: SearchHooks;
 }
 

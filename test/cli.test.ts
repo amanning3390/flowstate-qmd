@@ -337,9 +337,78 @@ describe("CLI Skill Commands", () => {
   });
 });
 
+describe("CLI Bootstrap Commands", () => {
+  test("doctor emits machine-readable readiness output", async () => {
+    const fakeHome = join(testDir, "doctor-home");
+    const fakeCache = join(testDir, "doctor-cache");
+    await mkdir(fakeHome, { recursive: true });
+    await mkdir(fakeCache, { recursive: true });
+
+    const { stdout, exitCode } = await runQmd(["doctor", "--json", "--target", "gemini,kiro,vscode"], {
+      env: {
+        HOME: fakeHome,
+        XDG_CACHE_HOME: fakeCache,
+      },
+    });
+
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.host).toBeTruthy();
+    expect(parsed.selectedProfile).toBeTruthy();
+    expect(parsed.preferredToolOrder).toEqual([
+      "fetch_anticipatory_context",
+      "query",
+      "get",
+      "multi_get",
+      "status",
+    ]);
+    expect(parsed.targets).toHaveLength(3);
+  });
+
+  test("init installs wrapper configs and bootstrap artifacts", async () => {
+    const fakeHome = join(testDir, "init-home");
+    const fakeCache = join(testDir, "init-cache");
+    const workspace = join(testDir, "init-workspace");
+    await mkdir(fakeHome, { recursive: true });
+    await mkdir(fakeCache, { recursive: true });
+    await mkdir(workspace, { recursive: true });
+
+    const { stdout, exitCode } = await runQmd([
+      "init",
+      "--yes",
+      "--target",
+      "gemini,kiro,vscode,codex",
+    ], {
+      cwd: workspace,
+      env: {
+        HOME: fakeHome,
+        XDG_CACHE_HOME: fakeCache,
+      },
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stdout.toLowerCase()).toContain("flowstate-qmd");
+
+    const cacheDir = join(fakeCache, "qmd");
+    expect(existsSync(join(cacheDir, "bootstrap-report.json"))).toBe(true);
+    expect(existsSync(join(cacheDir, "agent-config.json"))).toBe(true);
+    expect(readFileSync(join(fakeHome, ".gemini", "settings.json"), "utf-8")).toContain("\"qmd\"");
+    expect(readFileSync(join(fakeHome, ".codex", "config.toml"), "utf-8")).toContain("[mcp_servers.qmd]");
+    expect(readFileSync(join(workspace, ".kiro", "settings", "mcp.json"), "utf-8")).toContain("\"qmd\"");
+    expect(readFileSync(join(workspace, ".vscode", "mcp.json"), "utf-8")).toContain("\"qmd\"");
+  });
+});
+
 describe("CLI Add Command", () => {
   test("adds files from current directory", async () => {
     const { stdout, exitCode } = await runQmd(["collection", "add", "."]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Collection:");
+    expect(stdout).toContain("Indexed:");
+  });
+
+  test("supports qmd index as an alias for collection add", async () => {
+    const { stdout, exitCode } = await runQmd(["index", "."]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Collection:");
     expect(stdout).toContain("Indexed:");
@@ -646,6 +715,12 @@ describe("CLI Error Handling", () => {
     expect(exitCode).toBe(1);
     // Should indicate unknown command
     expect(stderr).toContain("Unknown command");
+  });
+
+  test("supports qmd flow start --watch as a compatibility alias", async () => {
+    const { stderr, exitCode } = await runQmd(["flow", "start", "--watch", "/tmp/missing.log"]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("[FLOW] Target file not found: /tmp/missing.log");
   });
 
   test("uses INDEX_PATH environment variable", async () => {

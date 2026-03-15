@@ -25,7 +25,9 @@ import {
   type QMDStore,
   type ExpandedQuery,
   type IndexStatus,
+  type HybridQueryResult,
 } from "../index.js";
+import { readIntuitionCache } from "../flow/engine.js";
 
 // =============================================================================
 // Types for structured content
@@ -53,6 +55,22 @@ type StatusResult = {
   }[];
 };
 
+type AnticipatoryMemory = {
+  file: string;
+  title: string;
+  score: number;
+  context: string | null;
+  snippet: string;
+};
+
+export type AnticipatoryContextPayload = {
+  source: "cache" | "live_query" | "empty";
+  query: string;
+  timestamp: string;
+  memories: AnticipatoryMemory[];
+  note?: string;
+};
+
 // =============================================================================
 // Helper functions
 // =============================================================================
@@ -78,6 +96,63 @@ function formatSearchSummary(results: SearchResultItem[], query: string): string
     lines.push(`${r.docid} ${Math.round(r.score * 100)}% ${r.file} - ${r.title}`);
   }
   return lines.join('\n');
+}
+
+function formatAnticipatoryMemories(results: HybridQueryResult[], query: string): AnticipatoryMemory[] {
+  return results.map((result) => {
+    const { snippet } = extractSnippet(result.bestChunk || result.body || "", query, 300);
+    return {
+      file: result.displayPath || result.file,
+      title: result.title,
+      score: Math.round(result.score * 100) / 100,
+      context: result.context,
+      snippet,
+    };
+  });
+}
+
+export async function getAnticipatoryContextPayload(
+  store: QMDStore,
+  options: { recentConversation?: string; refresh?: boolean; liteMode?: boolean } = {}
+): Promise<AnticipatoryContextPayload> {
+  const query = options.recentConversation?.trim() || "";
+  const cached = !options.refresh ? readIntuitionCache() : null;
+
+  if (cached && cached.memories.length > 0) {
+    return {
+      source: "cache",
+      query: cached.query,
+      timestamp: new Date(cached.timestamp).toISOString(),
+      memories: formatAnticipatoryMemories(cached.memories, cached.query),
+    };
+  }
+
+  if (!query) {
+    return {
+      source: "empty",
+      query: "",
+      timestamp: new Date().toISOString(),
+      memories: [],
+      note: "No anticipatory cache was available and no recent conversation was provided.",
+    };
+  }
+
+  const liveResults = await store.search({
+    query,
+    limit: 3,
+    minScore: 0.25,
+    intent: "coding agent project memory for the current turn",
+  });
+
+  return {
+    source: "live_query",
+    query,
+    timestamp: new Date().toISOString(),
+    memories: formatAnticipatoryMemories(liveResults, query),
+    note: liveResults.length > 0
+      ? "FlowState cache was unavailable, so these memories were retrieved live from the project knowledge base."
+      : "No anticipatory memories matched the current conversation.",
+  };
 }
 
 // =============================================================================
@@ -121,6 +196,12 @@ async function buildInstructions(store: QMDStore): Promise<string> {
   }
 
   // --- Search tool ---
+  lines.push("");
+  lines.push("Coding-agent memory workflow:");
+  lines.push("  1. Call `fetch_anticipatory_context` first when you have recent turn context.");
+  lines.push("  2. Use `query` when you need deeper retrieval, better recall, or more control.");
+  lines.push("  3. Use `get` / `multi_get` to pull exact documents once you know what matters.");
+
   lines.push("");
   lines.push("Search: Use `query` with sub-queries (lex/vec/hyde):");
   lines.push("  - type:'lex' — BM25 keyword search (exact terms, fast)");
@@ -524,24 +605,27 @@ Intent-aware lex (C++ performance, not sports):
     "fetch_anticipatory_context",
     {
       title: "Fetch Anticipatory Context",
-      description: "Fetch immediate, predictive context based on the current conversational state. This is the FlowState-QMD anticipatory memory tool that eliminates the Stutter Loop.",
+      description: "Fetch immediate project memory for the current coding turn. Prefers FlowState's anticipatory cache and falls back to a live project-memory query when needed.",
       annotations: { readOnlyHint: true, openWorldHint: false },
-      inputSchema: {},
+      inputSchema: {
+        recent_conversation: z.string().optional().describe("Recent turn or conversation context to use when the anticipatory cache is missing or needs refresh."),
+        refresh: z.boolean().optional().describe("Ignore the current cache and perform a fresh anticipatory lookup."),
+        lite_mode: z.boolean().optional().describe("Reserved for clients that want to hint at lightweight anticipatory refreshes."),
+      },
     },
-    async () => {
-      // For now, return a static response indicating the tool is available
-      // In a real implementation, this would use the store's hybrid query
-      const status = await store.getStatus();
+    async (args) => {
+      const payload = await getAnticipatoryContextPayload(store, {
+        recentConversation: args.recent_conversation,
+        refresh: args.refresh,
+        liteMode: args.lite_mode,
+      });
+
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({
-            message: "FlowState-QMD anticipatory memory tool is ready",
-            totalDocuments: status.totalDocuments,
-            note: "This tool is under development. Use the 'query' tool for regular search.",
-            timestamp: new Date().toISOString(),
-          }, null, 2),
+          text: JSON.stringify(payload, null, 2),
         }],
+        structuredContent: payload,
       };
     }
   );

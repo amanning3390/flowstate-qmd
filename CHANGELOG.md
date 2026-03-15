@@ -41,8 +41,22 @@ FlowState additions by Adam Manning for the Hermes 2026 Hackathon.
 
 ## [Unreleased]
 
+### Added
+
+- Coding-agent focused README and demo guide with a canonical FlowState + MCP workflow.
+- `qmd index` compatibility alias for `qmd collection add`.
+- `qmd flow start --watch <file>` compatibility alias for the FlowState watcher.
+- Real `fetch_anticipatory_context` MCP behavior: prefers the anticipatory cache and falls back to a live project-memory query.
+- A packaged coding-agent skill and MCP setup reference aligned to the `qmd` namespace.
+- `qmd init` bootstrapper with host profiling, model-profile recommendation, wrapper config emission, and a machine-readable bootstrap report.
+- `qmd doctor` readiness checks for Bun, Node, model cache state, and Hermes/Claude/Codex/Gemini/Kiro/VS Code compatibility targets.
+
 ### Fixes
 
+- FlowState cache writes are now deterministic and atomic instead of racing an async rename.
+- FlowState cache reads now have a shared helper so the CLI, tests, and MCP layer can rely on one contract.
+- Replaced the FlowState `@ts-ignore` lite-mode path with a typed option.
+- Synced embedded skill packaging with the tested `qmd` public contract.
 - Sync stale `bun.lock` (`better-sqlite3` 11.x → 12.x). CI and release
   script now use `--frozen-lockfile` to prevent recurrence. #386
   (thanks @Mic92)

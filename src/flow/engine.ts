@@ -3,6 +3,8 @@ import {
   statSync,
   existsSync,
   writeFileSync,
+  readFileSync,
+  renameSync,
   mkdirSync,
   openSync,
   closeSync,
@@ -13,8 +15,6 @@ import { homedir } from "os";
 import { createStore, hybridQuery } from "../store.js";
 import type { HybridQueryResult } from "../store.js";
 
-const CACHE_DIR = join(homedir(), ".cache", "qmd");
-const INTUITION_CACHE = join(CACHE_DIR, "intuition.json");
 const TAIL_BYTES = 2048;
 const MIN_CONTEXT_CHARS = 50;
 const DEBOUNCE_MS = 1500;
@@ -25,26 +25,116 @@ export type Intuition = {
   memories: HybridQueryResult[];
 };
 
+type FlowEngineRuntime = {
+  watch: typeof watch;
+  statSync: typeof statSync;
+  existsSync: typeof existsSync;
+  writeFileSync: typeof writeFileSync;
+  readFileSync: typeof readFileSync;
+  renameSync: typeof renameSync;
+  mkdirSync: typeof mkdirSync;
+  openSync: typeof openSync;
+  closeSync: typeof closeSync;
+  readSync: typeof readSync;
+  homedir: typeof homedir;
+  createStore: typeof createStore;
+  hybridQuery: typeof hybridQuery;
+};
+
+const defaultRuntime: FlowEngineRuntime = {
+  watch,
+  statSync,
+  existsSync,
+  writeFileSync,
+  readFileSync,
+  renameSync,
+  mkdirSync,
+  openSync,
+  closeSync,
+  readSync,
+  homedir,
+  createStore,
+  hybridQuery,
+};
+
+let runtimeOverrides: Partial<FlowEngineRuntime> = {};
+
+function getRuntime(): FlowEngineRuntime {
+  return {
+    ...defaultRuntime,
+    ...runtimeOverrides,
+  };
+}
+
+function getCacheDir(): string {
+  return join(getRuntime().homedir(), ".cache", "qmd");
+}
+
+function getIntuitionCachePath(): string {
+  return join(getCacheDir(), "intuition.json");
+}
+
+export function setFlowEngineRuntimeForTests(overrides: Partial<FlowEngineRuntime> | null): void {
+  runtimeOverrides = overrides ?? {};
+}
+
+function persistIntuitionCache(intuition: Intuition): void {
+  const runtime = getRuntime();
+  const intuitionCache = getIntuitionCachePath();
+  const payload = JSON.stringify(intuition, null, 2);
+  const tempCachePath = `${intuitionCache}.tmp`;
+
+  if (typeof runtime.renameSync !== "function") {
+    runtime.writeFileSync(intuitionCache, payload);
+    return;
+  }
+
+  runtime.writeFileSync(tempCachePath, payload);
+  try {
+    runtime.renameSync(tempCachePath, intuitionCache);
+  } catch {
+    runtime.writeFileSync(intuitionCache, payload);
+  }
+}
+
+export function readIntuitionCache(): Intuition | null {
+  const runtime = getRuntime();
+  const intuitionCache = getIntuitionCachePath();
+  if (!runtime.existsSync(intuitionCache)) {
+    return null;
+  }
+
+  try {
+    const raw = runtime.readFileSync(intuitionCache, "utf-8");
+    return JSON.parse(raw) as Intuition;
+  } catch {
+    return null;
+  }
+}
+
 function ensureCacheDir(): void {
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
+  const runtime = getRuntime();
+  const cacheDir = getCacheDir();
+  if (!runtime.existsSync(cacheDir)) {
+    runtime.mkdirSync(cacheDir, { recursive: true });
   }
 }
 
 function readTail(path: string, fileSize: number, maxBytes: number = TAIL_BYTES): string {
+  const runtime = getRuntime();
   const bytesToRead = Math.min(fileSize, maxBytes);
   if (bytesToRead <= 0) {
     return "";
   }
 
   const buffer = Buffer.alloc(bytesToRead);
-  const fd = openSync(path, "r");
+  const fd = runtime.openSync(path, "r");
 
   try {
-    readSync(fd, buffer, 0, bytesToRead, fileSize - bytesToRead);
+    runtime.readSync(fd, buffer, 0, bytesToRead, fileSize - bytesToRead);
     return buffer.toString("utf-8");
   } finally {
-    closeSync(fd);
+    runtime.closeSync(fd);
   }
 }
 
@@ -53,14 +143,14 @@ function readTail(path: string, fileSize: number, maxBytes: number = TAIL_BYTES)
  * Uses the standalone hybridQuery() which manages its own LLM session.
  */
 export async function updateIntuition(context: string, isLiteMode: boolean = false): Promise<void> {
-  const store = createStore();
+  const runtime = getRuntime();
+  const store = runtime.createStore();
 
   try {
-    const results = await hybridQuery(store, context, {
+    const results = await runtime.hybridQuery(store, context, {
       limit: 3,
       minScore: 0.4,
-      // @ts-ignore
-      useLiteModels: isLiteMode
+      liteMode: isLiteMode,
     });
 
     const intuition: Intuition = {
@@ -68,18 +158,8 @@ export async function updateIntuition(context: string, isLiteMode: boolean = fal
       query: context.slice(-200),
       memories: results,
     };
-
-
     ensureCacheDir();
-    const tempCachePath = `${INTUITION_CACHE}.tmp`;
-    writeFileSync(tempCachePath, JSON.stringify(intuition, null, 2));
-    // Atomic rename to prevent race conditions
-    import("fs").then(fs => {
-      fs.renameSync(tempCachePath, INTUITION_CACHE);
-    }).catch(err => {
-      // Fallback
-      writeFileSync(INTUITION_CACHE, JSON.stringify(intuition, null, 2));
-    });
+    persistIntuitionCache(intuition);
 
     console.log(`[FLOW] Intuition updated (${results.length} memories)`);
   } catch (error) {
@@ -96,17 +176,18 @@ export async function updateIntuition(context: string, isLiteMode: boolean = fal
  * Includes a debouncer to prevent thrashing during rapid output.
  */
 export async function startFlowEngine(targetFile: string, isLiteMode: boolean = false): Promise<void> {
-  if (!existsSync(targetFile)) {
+  const runtime = getRuntime();
+  if (!runtime.existsSync(targetFile)) {
     throw new Error(`[FLOW] Target file not found: ${targetFile}`);
   }
 
   ensureCacheDir();
 
   console.log(`[FLOW] Monitoring ${targetFile} (Event-Driven)...`);
-  console.log(`[FLOW] Intuition cache: ${INTUITION_CACHE}`);
+  console.log(`[FLOW] Intuition cache: ${getIntuitionCachePath()}`);
   console.log("[FLOW] Press Ctrl+C to stop.");
 
-  let lastSize = statSync(targetFile).size;
+  let lastSize = runtime.statSync(targetFile).size;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let updateInFlight = false;
   let rerunRequested = false;
@@ -120,7 +201,7 @@ export async function startFlowEngine(targetFile: string, isLiteMode: boolean = 
     updateInFlight = true;
 
     try {
-      const stats = statSync(targetFile);
+      const stats = runtime.statSync(targetFile);
 
       if (stats.size < lastSize) {
         console.log("[FLOW] Target file was truncated or rotated; resetting watcher state.");
@@ -151,7 +232,7 @@ export async function startFlowEngine(targetFile: string, isLiteMode: boolean = 
     }
   };
 
-  const watcher = watch(targetFile, (eventType) => {
+  const watcher = runtime.watch(targetFile, (eventType) => {
     if (eventType !== "change") {
       return;
     }
