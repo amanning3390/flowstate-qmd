@@ -15,7 +15,9 @@ import { homedir } from "os";
 import { createStore, hybridQuery } from "../store.js";
 import type { HybridQueryResult } from "../store.js";
 
-const TAIL_BYTES = 2048;
+// 8KB tail captures ~2000 tokens of context, sufficient for most agent turns
+// while staying fast enough for real-time updates
+const TAIL_BYTES = 8192;
 const MIN_CONTEXT_CHARS = 50;
 const DEBOUNCE_MS = 1500;
 

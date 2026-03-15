@@ -242,14 +242,18 @@ qmd cleanup
 
 ### Lite
 
-- lower-memory FlowState mode
-- best for laptops or demo setups where you want the anticipatory cache running safely
+- **Models:** Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B (~1.2GB VRAM total)
+- **Use case:** Laptops, CI environments, or demo setups with <8GB RAM
+- **Trade-off:** ~15% lower retrieval accuracy vs Standard profile
+- **Auto-engaged:** Systems with <8GB RAM automatically use Lite mode
 
 Use:
 
 ```bash
 qmd flow ~/.codex/sessions/current.log --lite
 ```
+
+The `--lite` flag can also be passed to `qmd query` and `qmd embed` for consistent low-memory operation.
 
 ## Known Limits
 

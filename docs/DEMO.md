@@ -7,8 +7,14 @@ Show that a coding agent can retrieve repo memory before it falls back to a reac
 ## Setup
 
 ```bash
+# Install dependencies
 bun install
+
+# Download models (Qwen3-Embedding-4B, Qwen3-Reranker-4B, qmd-query-expansion-1.7B)
+# This caches ~8GB of models to ~/.cache/qmd/models/
 qmd pull
+
+# Index your project's documentation
 qmd collection add ./docs --name docs
 qmd collection add ./notes --name notes
 qmd collection add . --name repo-memory --mask 'CHANGELOG.md'
