@@ -553,7 +553,7 @@ def scene_solution(progress: float) -> Image.Image:
         draw_neon_box(draw, (SAFE_LEFT, result_y, SAFE_RIGHT, result_y + 120), COLORS["cyan"])
         
         color = lerp_color(COLORS["void"], COLORS["white"], alpha)
-        draw_centered(draw, "Context loads in 48ms — before the agent even starts thinking", result_y + 40, FONT_BODY, color, glow=False)
+        draw_centered(draw, "Cache is warm before the agent starts thinking", result_y + 40, FONT_BODY, color, glow=False)
     
     draw_scan_lines(draw, 0.03)
     return img
@@ -570,14 +570,14 @@ def scene_metrics(progress: float) -> Image.Image:
     
     # Title
     draw_glowing_text(draw, "MEASURED RESULTS", SAFE_LEFT, SAFE_TOP, FONT_SUBTITLE, COLORS["green"])
-    draw.text((SAFE_LEFT, SAFE_TOP + 50), "Apple M4, 24GB • 5,000 documents", font=FONT_BODY, fill=COLORS["ghost"])
+    draw.text((SAFE_LEFT, SAFE_TOP + 50), "Reproducible benchmarks — run: bun bench/latency.ts", font=FONT_BODY, fill=COLORS["ghost"])
     
     # Metrics in a 2x2 grid - properly positioned
     metrics = [
-        {"value": 50, "suffix": "x", "label": "Faster Response", "color": COLORS["cyan"]},
-        {"value": 89, "suffix": "%", "label": "Fewer Tool Calls", "color": COLORS["green"]},
-        {"value": 73, "suffix": "%", "label": "Cache Hit Rate", "color": COLORS["purple"]},
-        {"value": 48, "suffix": "ms", "label": "Average Latency", "color": COLORS["orange"]},
+        {"value": 5, "suffix": "", "label": "MCP Tools", "color": COLORS["cyan"]},
+        {"value": 90, "suffix": "%", "label": "Dedup Threshold", "color": COLORS["green"]},
+        {"value": 648, "suffix": "", "label": "Tests Passing", "color": COLORS["purple"]},
+        {"value": 8, "suffix": "", "label": "Agent Wrappers", "color": COLORS["orange"]},
     ]
     
     card_w, card_h = 650, 200
@@ -633,7 +633,7 @@ def scene_metrics(progress: float) -> Image.Image:
         alpha = ease_out((progress - 0.85) * 6)
         y = 700
         color = lerp_color(COLORS["void"], COLORS["white"], alpha)
-        draw_centered(draw, "2,400ms → 48ms", y, FONT_TITLE, color)
+        draw_centered(draw, "Cache read vs full search — run the benchmarks", y, FONT_TITLE, color)
         
         color = lerp_color(COLORS["void"], COLORS["cyan"], alpha)
         draw_centered(draw, "The difference between interruption and intuition", y + 70, FONT_BODY, color, glow=False)
@@ -673,7 +673,7 @@ def scene_technical(progress: float) -> Image.Image:
         ("✓ store.test.ts        (180)", COLORS["green"]),
         ("✓ cli.test.ts          (156)", COLORS["green"]),
         ("", COLORS["white"]),
-        ("Tests:  656 passed", COLORS["cyan"]),
+        ("Tests:  648 passed", COLORS["cyan"]),
         ("Time:   50.25s", COLORS["ghost"]),
     ]
     
@@ -814,7 +814,7 @@ def scene_comparison(progress: float) -> Image.Image:
     
     # Timer for right - instant!
     if progress > 0.3:
-        draw_glowing_text(draw, "48ms", right_x + 280, col_y + 420, FONT_TITLE, COLORS["green"])
+        draw_glowing_text(draw, "cached", right_x + 280, col_y + 420, FONT_TITLE, COLORS["green"])
     
     # VS divider
     vs_y = col_y + col_h // 2 - 20
@@ -862,7 +862,7 @@ def scene_finale(progress: float) -> Image.Image:
     # Stats
     if progress > 0.45:
         alpha = ease_out((progress - 0.45) * 2)
-        draw_centered(draw, "50x faster  •  89% fewer calls  •  656 tests passing", 540, FONT_BODY,
+        draw_centered(draw, "648 tests  •  0.90 dedup threshold  •  8 agent wrappers", 540, FONT_BODY,
                      lerp_color(COLORS["void"], COLORS["ghost"], alpha))
     
     # GitHub

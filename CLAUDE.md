@@ -26,6 +26,12 @@ qmd mcp                           # Start MCP server (stdio transport)
 qmd mcp --http [--port N]         # Start MCP server (HTTP, default port 8181)
 qmd mcp --http --daemon           # Start as background daemon
 qmd mcp stop                      # Stop background MCP daemon
+qmd init --target <targets>       # Bootstrap agent wrapper configs (hermes,claude-code,...)
+qmd init --target all             # Bootstrap all supported agent wrappers
+qmd doctor                        # Check host readiness (models, deps, profiles)
+qmd doctor --json                 # Machine-readable doctor output
+qmd flow <logfile>                # Start FlowState anticipatory cache watcher
+qmd flow <logfile> --lite         # FlowState in lite mode (skip reranking, smaller limits)
 ```
 
 ## Collection Management
@@ -138,6 +144,32 @@ bun test --preload ./src/test-preload.ts test/
 - node-llama-cpp for embeddings (embeddinggemma), reranking (qwen3-reranker), and query expansion (Qwen3)
 - Reciprocal Rank Fusion (RRF) for combining results
 - Smart chunking: 900 tokens/chunk with 15% overlap, prefers markdown headings as boundaries
+
+## FlowState Anticipatory Cache
+
+The FlowState engine (`src/flow/engine.ts`) watches an agent's session log via `fs.watch` with
+1500ms debounce, runs `hybridQuery()` on the last 8KB of context, and caches top-3 results to
+`~/.cache/qmd/intuition.json`. Telemetry (hit/miss counts, refresh latency) is persisted to
+`~/.cache/qmd/telemetry.json` and surfaced via `qmd status` and the MCP `status` tool.
+
+## Multi-Agent Idempotency
+
+Documents are deduplicated at index time using cosine similarity against `vectors_vec`.
+Threshold: 0.90 (configurable via `DEDUP_SIMILARITY_THRESHOLD`). Documents above the
+threshold annotate the existing record instead of creating duplicates. Stats are tracked
+via `getDedupStats()` and visible in `qmd status`.
+
+## Benchmarks
+
+Reproducible benchmarks live in `bench/`:
+
+```sh
+bun bench/latency.ts       # FTS vs hybrid vs hybrid-lite search latency
+bun bench/cache-hit.ts     # Intuition cache read/parse latency
+bun bench/tool-calls.ts    # MCP tool round-trip simulation
+```
+
+All output JSON for programmatic consumption.
 
 ## Important: Do NOT run automatically
 

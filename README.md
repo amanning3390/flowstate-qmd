@@ -244,7 +244,7 @@ qmd cleanup
 
 - **Models:** Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B (~1.2GB VRAM total)
 - **Use case:** Laptops, CI environments, or demo setups with <8GB RAM
-- **Trade-off:** ~15% lower retrieval accuracy vs Standard profile
+- **Behavior:** `hybridQuery()` caps results at 5, limits candidates to 15, and **skips LLM reranking**
 - **Auto-engaged:** Systems with <8GB RAM automatically use Lite mode
 
 Use:
@@ -281,11 +281,69 @@ qmd mcp --http --daemon
 qmd mcp stop
 ```
 
+## Multi-Agent Idempotency
+
+When multiple agents index the same project, FlowState-QMD prevents duplicate memories:
+
+```bash
+# Agent A indexes a doc about auth rollback
+# Agent B tries to index a semantically identical doc
+# → QMD detects 0.94 cosine similarity (threshold: 0.90)
+# → Annotates existing memory instead of duplicating
+```
+
+Dedup stats are tracked via `getDedupStats()` and visible in `qmd status`.
+
+## Cache Telemetry
+
+FlowState tracks cache hit/miss rates and refresh latency in `~/.cache/qmd/telemetry.json`, surfaced via `qmd status` and the MCP `status` tool.
+
+## Benchmarks
+
+Reproducible benchmarks in `bench/`:
+
+```bash
+bun bench/latency.ts       # FTS vs hybrid vs hybrid-lite search latency
+bun bench/cache-hit.ts     # Intuition cache read/parse latency (1000 rounds)
+bun bench/tool-calls.ts    # MCP tool round-trip simulation
+```
+
+All output JSON for programmatic consumption.
+
 ## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Agent (Hermes, Claude Code, Codex, ...) │
+│                              │                              │
+│                    MCP tool calls                           │
+│                              ▼                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              MCP Server (stdio / HTTP)               │    │
+│  │  fetch_anticipatory_context │ query │ get │ status   │    │
+│  └──────────────┬──────────────┴───────┴─────┴──────┘    │
+│                 │                        │               │
+│     ┌───────────▼──────────┐   ┌────────▼────────┐      │
+│     │   FlowState Engine   │   │   Store (SQLite) │      │
+│     │  fs.watch + debounce │   │  FTS5 + vec      │      │
+│     │  intuition.json      │   │  BM25 + cosine   │      │
+│     │  telemetry.json      │   │  RRF fusion      │      │
+│     └──────────────────────┘   │  LLM reranking   │      │
+│                                │  Idempotency     │      │
+│                                └──────────────────┘      │
+│                                         │                │
+│                              ┌──────────▼──────────┐     │
+│                              │   node-llama-cpp    │     │
+│                              │  Qwen3 Embed + Rank │     │
+│                              └─────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
 
 - **Store**: SQLite + FTS5 + `sqlite-vec`
 - **Retrieval**: BM25 + vector search + reciprocal rank fusion + reranking
 - **FlowState**: event-driven watcher that keeps `intuition.json` fresh
+- **Idempotency**: cosine similarity dedup at 0.90 threshold on document ingest
+- **Telemetry**: cache hit/miss tracking persisted to `telemetry.json`
 - **Interfaces**: CLI, MCP server, SDK, packaged agent skill
 
 ## Submission Assets

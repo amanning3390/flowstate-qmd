@@ -67,6 +67,102 @@ function getLlm(store: Store): LlamaCpp {
 }
 
 // =============================================================================
+// Multi-Agent Idempotency Layer
+// =============================================================================
+
+/** Cosine similarity threshold above which a document is considered a duplicate. */
+export const DEDUP_SIMILARITY_THRESHOLD = 0.90;
+
+export type DedupCheckResult = {
+  isDuplicate: boolean;
+  existingDocId?: string;
+  similarity?: number;
+};
+
+export type DedupStats = {
+  checked: number;
+  deduped: number;
+  inserted: number;
+};
+
+const dedupStats: DedupStats = { checked: 0, deduped: 0, inserted: 0 };
+
+export function getDedupStats(): DedupStats {
+  return { ...dedupStats };
+}
+
+export function resetDedupStats(): void {
+  dedupStats.checked = 0;
+  dedupStats.deduped = 0;
+  dedupStats.inserted = 0;
+}
+
+/**
+ * Check whether a document with the given embedding already exists in a
+ * collection with cosine similarity above the threshold.
+ *
+ * Uses sqlite-vec's cosine distance: similarity = 1 - distance.
+ * Only checks against documents in the same collection.
+ */
+export function checkDuplicateDocument(
+  db: Database,
+  embedding: Float32Array,
+  collection: string,
+  threshold: number = DEDUP_SIMILARITY_THRESHOLD,
+): DedupCheckResult {
+  dedupStats.checked++;
+
+  const tableExists = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='vectors_vec'`
+  ).get();
+  if (!tableExists) {
+    return { isDuplicate: false };
+  }
+
+  // Find nearest vector match — k=5 gives us a small pool to check
+  let vecResults: { hash_seq: string; distance: number }[];
+  try {
+    vecResults = db.prepare(`
+      SELECT hash_seq, distance
+      FROM vectors_vec
+      WHERE embedding MATCH ? AND k = 5
+    `).all(embedding) as { hash_seq: string; distance: number }[];
+  } catch {
+    // sqlite-vec module not available
+    return { isDuplicate: false };
+  }
+
+  if (vecResults.length === 0) {
+    return { isDuplicate: false };
+  }
+
+  // Check each match: resolve hash_seq → document, filter by collection
+  for (const { hash_seq, distance } of vecResults) {
+    const similarity = 1 - distance;
+    if (similarity < threshold) continue;
+
+    const hash = hash_seq.split("_")[0];
+    const doc = db.prepare(`
+      SELECT d.path
+      FROM documents d
+      WHERE d.hash = ? AND d.collection = ? AND d.active = 1
+      LIMIT 1
+    `).get(hash, collection) as { path: string } | undefined;
+
+    if (doc) {
+      dedupStats.deduped++;
+      return {
+        isDuplicate: true,
+        existingDocId: hash.slice(0, 6),
+        similarity,
+      };
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
+// =============================================================================
 // Smart Chunking - Break Point Detection
 // =============================================================================
 
@@ -1051,6 +1147,11 @@ export type Store = {
   getHashesForEmbedding: () => { hash: string; body: string; path: string }[];
   clearAllEmbeddings: () => void;
   insertEmbedding: (hash: string, seq: number, pos: number, embedding: Float32Array, model: string, embeddedAt: string) => void;
+
+  // Idempotency / dedup
+  checkDuplicateDocument: (embedding: Float32Array, collection: string, threshold?: number) => DedupCheckResult;
+  getDedupStats: () => DedupStats;
+  resetDedupStats: () => void;
 };
 
 // =============================================================================
@@ -1527,6 +1628,11 @@ export function createStore(dbPath?: string): Store {
     getHashesForEmbedding: () => getHashesForEmbedding(db),
     clearAllEmbeddings: () => clearAllEmbeddings(db),
     insertEmbedding: (hash: string, seq: number, pos: number, embedding: Float32Array, model: string, embeddedAt: string) => insertEmbedding(db, hash, seq, pos, embedding, model, embeddedAt),
+
+    // Idempotency / dedup
+    checkDuplicateDocument: (embedding: Float32Array, collection: string, threshold?: number) => checkDuplicateDocument(db, embedding, collection, threshold),
+    getDedupStats,
+    resetDedupStats,
   };
 
   return store;
@@ -3715,13 +3821,14 @@ export async function hybridQuery(
   query: string,
   options?: HybridQueryOptions
 ): Promise<HybridQueryResult[]> {
-  const limit = options?.limit ?? 10;
+  const liteMode = options?.liteMode ?? false;
+  const limit = liteMode ? Math.min(options?.limit ?? 5, 5) : (options?.limit ?? 10);
   const minScore = options?.minScore ?? 0;
-  const candidateLimit = options?.candidateLimit ?? RERANK_CANDIDATE_LIMIT;
+  const candidateLimit = liteMode ? Math.min(options?.candidateLimit ?? 15, 15) : (options?.candidateLimit ?? RERANK_CANDIDATE_LIMIT);
   const collection = options?.collection;
   const explain = options?.explain ?? false;
   const intent = options?.intent;
-  const skipRerank = options?.skipRerank ?? false;
+  const skipRerank = liteMode ? true : (options?.skipRerank ?? false);
   const hooks = options?.hooks;
 
   const rankedLists: RankedResult[][] = [];
