@@ -20,3 +20,6 @@ finetune/outputs/
 finetune/data/train/
 .claude/
 __pycache__/
+assets/video/*
+!assets/video/flowstate_demo.mp4
+!assets/video/winning_video.py
