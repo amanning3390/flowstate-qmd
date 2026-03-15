@@ -22,4 +22,5 @@ finetune/data/train/
 __pycache__/
 assets/video/*
 !assets/video/flowstate_demo.mp4
-!assets/video/winning_video.py
+!assets/video/generate_demo.py
+.mcp.json

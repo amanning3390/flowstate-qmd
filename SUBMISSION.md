@@ -40,13 +40,26 @@ Instead of waiting for an agent to realize it's missing information, FLOWSTATE-Q
 
 ### 3. Performance Benchmarks
 
-Benchmarks are reproducible via `bench/` scripts (`bun bench/latency.ts`, `bun bench/cache-hit.ts`, `bun bench/tool-calls.ts`). All output JSON.
+Benchmarks are reproducible via `bench/` scripts (`bun bench/cache-hit.ts`, `bun bench/latency.ts`, `bun bench/tool-calls.ts`, `bun bench/full-bench.ts`). All output JSON.
 
 | Metric | Methodology | Notes |
 |--------|-------------|-------|
 | Cache read latency | `bench/cache-hit.ts` — 1,000 rounds of `readFileSync` + `JSON.parse` on `intuition.json` | Measures the fast path when cache is warm |
+| Full benchmark suite | `bench/full-bench.ts` — 100 rounds, 5 warmup, 31 indexed docs | Cache read vs FTS vs document retrieval vs status |
 | Search latency (FTS vs hybrid vs hybrid-lite) | `bench/latency.ts` — 10 rounds per query, 3 queries, with warmup | Compares BM25-only, full hybrid (with reranking), and lite hybrid (no reranking) |
 | MCP tool round-trip | `bench/tool-calls.ts` — 20 rounds per tool, 3 warmup rounds | Measures `status`, `search`, `query`, and `fetch_anticipatory_context` |
+
+**Benchmark Results** (from `bench/full-bench.ts`, 100 rounds, 31 indexed documents):
+
+| Operation | p50 | avg | p95 |
+|-----------|-----|-----|-----|
+| FlowState cache read | **0.012ms** | 0.12ms | 0.025ms |
+| FTS search (BM25) | 0.33ms | 1.32ms | 8.49ms |
+| Document retrieval | 0.17ms | 0.50ms | 0.24ms |
+| Store status | 0.08ms | 0.54ms | 0.13ms |
+| Cache miss (existsSync) | 0.003ms | 0.003ms | 0.003ms |
+
+The anticipatory cache read is **~27x faster than the simplest FTS search** at p50. Against a full hybrid pipeline (embedding + vector search + reranking), the gap widens to orders of magnitude.
 
 **Hardware Profiles:**
 
@@ -102,13 +115,15 @@ Five tools exposed via Model Context Protocol:
 | `multi_get` | Batch retrieve by glob or comma-separated list |
 | `status` | Index health, stats, FlowState telemetry, and dedup stats |
 
-**Supported Agent Wrappers:**
+**Supported Agent Wrappers (8 targets):**
 - Hermes Agent (`~/.hermes/config.yaml`)
 - Claude Code (`~/.claude.json`)
 - Codex CLI (`~/.codex/config.toml`)
 - Gemini CLI (`~/.gemini/settings.json`)
 - Kiro (`.kiro/settings/mcp.json`)
 - VS Code (`.vscode/mcp.json`)
+- OpenClaw (`.openclaw/config.json`)
+- pi (`.pi/settings.json`)
 
 ---
 
@@ -134,8 +149,8 @@ Telemetry is surfaced via `qmd status` and the MCP `status` tool.
 ### 8. Test Coverage
 
 ```
-Test Files:  18 passed (18)
-Tests:       648 passed | 66 skipped (714 total)
+Test Files:  19 passed (19)
+Tests:       736 passed | 66 skipped (802 total)
 ```
 
 Key test suites:
@@ -176,14 +191,14 @@ Agent: "Based on the changelog entry from March 3rd, the auth migration was
 This project is an evolution of [`@tobi/qmd`](https://github.com/tobi/qmd) by Tobi Lütke. We chose to build on QMD because its local-first, SQLite-Vec-based architecture is the gold standard for high-performance terminal search.
 
 **New code added for this hackathon:**
-- `src/flow/engine.ts` (274 lines) — FlowState anticipatory cache engine with telemetry
-- `src/bootstrap.ts` (684 lines) — Multi-agent bootstrap system for 8 wrapper targets
+- `src/flow/engine.ts` (352 lines) — FlowState anticipatory cache engine with telemetry
+- `src/bootstrap.ts` (683 lines) — Multi-agent bootstrap system for 8 wrapper targets
 - `src/store.ts` additions (~80 lines) — Idempotency layer with cosine dedup + lite mode wiring
 - `src/embedded-skills.ts` (248 lines) — Packaged agent skill embedding
 - `src/mcp/server.ts` additions (~100 lines) — `fetch_anticipatory_context` tool + telemetry in status
-- `bench/` (3 files) — Reproducible benchmark scripts
+- `bench/` (5 files) — Reproducible benchmark scripts including `full-bench.ts` with real results
 - `test/idempotency.test.ts` (10 tests) — Idempotency integration tests
-- `test/flow.engine.test.ts` (10 new tests) — Telemetry and cache lifecycle tests
+- `test/flow.engine.test.ts` (16 tests) — Telemetry and cache lifecycle tests
 - `finetune/` — SFT fine-tuning pipeline for query expansion model
 - `assets/video/` — Hackathon video generation
 
